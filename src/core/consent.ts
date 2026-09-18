@@ -15,15 +15,29 @@
 export const NOTICE_VERSION = 'v1'
 
 /**
- * Build Spec §10 records `purposes` per consent, and Ideation §15 lists what is collected. The
- * four separate because a customer can reasonably want the first two and refuse the last two:
- * a delivery needs the address, nothing needs a promotional SMS.
+ * Exactly the purpose keys the notice texts declare in their frontmatter
+ * (contracts/notices/v1/*.md). Nothing else may appear here: a purpose no notice describes is
+ * one no customer has been told about, and consent to it would be unlawful. `call_recording`
+ * is what the voice consent gate checks at M2 (Build Spec §10).
  */
 export type ConsentPurpose =
   | 'order_fulfilment'
   | 'order_history'
   | 'personalisation'
-  | 'marketing'
+  | 'call_recording'
+
+/**
+ * What each notice version actually told the customer. Core cannot read the notice files
+ * (it has no filesystem access by design), so this is a literal, and consent.test.ts asserts it
+ * matches the frontmatter so the two cannot drift.
+ *
+ * This is the half of the check that stops a stray value in `consent_record.purposes` — a
+ * staff-entry path, a route bug, a v2 purpose written onto a v1 record — from authorising a
+ * write the signed notice never covered. An unknown version is not in this map and fails closed.
+ */
+export const NOTICE_PURPOSES: Readonly<Record<string, readonly ConsentPurpose[]>> = {
+  v1: ['order_fulfilment', 'order_history', 'personalisation', 'call_recording'],
+}
 
 /** The `consent_record` fields the gate reads. Build Spec §4. */
 export type ConsentRecordView = {
@@ -48,6 +62,9 @@ export function hasValidConsent(
   // Any mismatch, not merely an older one. Versions are not ordered and never rewritten, so
   // "not the notice we are asking about" is the whole test.
   if (record.noticeVersion !== requiredVersion) return false
+  // Both halves: the notice they signed must have described this purpose, AND they must have
+  // ticked it. The record alone is not enough — see NOTICE_PURPOSES.
+  if (!NOTICE_PURPOSES[record.noticeVersion]?.includes(purpose)) return false
   return record.purposes.includes(purpose)
 }
 

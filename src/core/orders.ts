@@ -53,42 +53,47 @@ export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatu
   needs_attention: ['confirmed', 'cancelled'],
 }
 
-/** Carries both states so the thrown error names the move that was refused, not just "invalid". */
+/** Names the refused move in full, fulfilment included, so a log line is enough to diagnose it. */
 export class IllegalTransitionError extends Error {
   readonly from: OrderStatus
   readonly to: OrderStatus
+  readonly fulfilment: Fulfilment
 
-  constructor(from: OrderStatus, to: OrderStatus) {
-    super(`Illegal order transition: ${from} -> ${to}`)
+  constructor(from: OrderStatus, to: OrderStatus, fulfilment: Fulfilment) {
+    super(`Illegal order transition: ${from} -> ${to} (${fulfilment})`)
     this.name = 'IllegalTransitionError'
     this.from = from
     this.to = to
+    this.fulfilment = fulfilment
   }
 }
 
-export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return ORDER_TRANSITIONS[from].includes(to)
+/**
+ * The single source of truth for what an order may do next. Narrower than the table, because
+ * the table is fulfilment-blind: `out_for_delivery` is the rider leg and exists only for
+ * `delivery`, while a pickup or dine-in order goes `ready -> delivered` when the customer takes
+ * the food. The converse also holds — a delivery order must go out with a rider, so
+ * `delivered` is not reachable from `ready` for it.
+ *
+ * Both the dashboard's buttons (Build Spec §7) and the authorisation check below read this, so
+ * staff cannot be offered a move the API would refuse, nor the reverse.
+ */
+export function nextStatuses(from: OrderStatus, fulfilment: Fulfilment): OrderStatus[] {
+  const allowed = ORDER_TRANSITIONS[from]
+  if (fulfilment !== 'delivery') return allowed.filter((s) => s !== 'out_for_delivery')
+  return from === 'ready' ? allowed.filter((s) => s !== 'delivered') : [...allowed]
+}
+
+export function canTransition(from: OrderStatus, to: OrderStatus, fulfilment: Fulfilment): boolean {
+  return nextStatuses(from, fulfilment).includes(to)
 }
 
 /**
  * An illegal transition is a programmer error, not a state a customer can reach, so it fails
  * loudly (M1 design, "Error handling"). Routes validate their input before core sees it.
  */
-export function assertTransition(from: OrderStatus, to: OrderStatus): void {
-  if (!canTransition(from, to)) throw new IllegalTransitionError(from, to)
-}
-
-/**
- * What the dashboard offers for this order (Build Spec §7), which is narrower than what the
- * table permits: `out_for_delivery` is the rider leg and exists only for `delivery`, while a
- * pickup or dine-in order goes `ready -> delivered` when the customer takes the food. The
- * converse also holds — a delivery order must go out with a rider, so `delivered` is not
- * offered to staff while it is still `ready`.
- */
-export function nextStatuses(from: OrderStatus, fulfilment: Fulfilment): OrderStatus[] {
-  const allowed = ORDER_TRANSITIONS[from]
-  if (fulfilment !== 'delivery') return allowed.filter((s) => s !== 'out_for_delivery')
-  return from === 'ready' ? allowed.filter((s) => s !== 'delivered') : [...allowed]
+export function assertTransition(from: OrderStatus, to: OrderStatus, fulfilment: Fulfilment): void {
+  if (!canTransition(from, to, fulfilment)) throw new IllegalTransitionError(from, to, fulfilment)
 }
 
 /** `delivered` and `cancelled`, derived from the table so the two cannot drift apart. */

@@ -23,6 +23,8 @@ export type RedemptionResult =
 /** The `discount_code` fields the rules read. Build Spec §4. */
 export type DiscountCodeRules = {
   restaurantId: string
+  /** Decides what `priorRedemptions` counts — see RedemptionContext. */
+  kind: 'win_back_card' | 'manual'
   percent: number
   perCustomerLimit: number
   /** Null at either end means open-ended: a `manual` code need not have a closing date. */
@@ -34,7 +36,14 @@ export type DiscountCodeRules = {
 export type RedemptionContext = {
   /** The restaurant whose page or call this is — not the one printed on the card. */
   restaurantId: string
-  /** Rows already in `code_redemption` for this code and this customer. */
+  /**
+   * What the repository must count depends on `code.kind`, because the rule differs:
+   *  - `win_back_card`: this customer's win-back redemptions at this RESTAURANT, across every
+   *    code and batch. One card per phone per restaurant is what the packaging promises
+   *    (Ideation §8 flow 5), and a second batch must not reset it.
+   *  - `manual`: this customer's redemptions of this specific code.
+   * The database holds the same two rules as unique indexes on `code_redemption`.
+   */
   priorRedemptions: number
   /** Passed in, not read from the clock, so a validity window can be tested without waiting. */
   now: Date
@@ -51,12 +60,12 @@ export function canRedeem(code: DiscountCodeRules, context: RedemptionContext): 
   if (code.validFrom && context.now < code.validFrom) return { ok: false, reason: 'not_yet_valid' }
   if (code.validTo && context.now > code.validTo) return { ok: false, reason: 'expired' }
 
-  // Ideation §8 flow 5: one redemption per phone per restaurant. The database enforces this as
-  // well, with the unique index on `code_redemption (code_id, customer_id)` (Build Spec §4).
-  // Both are needed and neither substitutes for the other: this check exists to produce a
-  // message the customer can act on, and the index is what still holds when two taps arrive at
-  // once and both read zero prior redemptions. A caller that hits the index violation should
-  // surface it as this same refusal rather than as a 500.
+  // Ideation §8 flow 5: one redemption per phone per restaurant. The database enforces the same
+  // thing with two unique indexes on `code_redemption` (per code, and per restaurant for
+  // win-back cards). Both halves are needed and neither substitutes for the other: this check
+  // exists to produce a message the customer can act on, and the index is what still holds when
+  // two taps arrive at once and both read zero prior redemptions. A caller that hits the index
+  // violation should surface it as this same refusal rather than as a 500.
   if (context.priorRedemptions >= code.perCustomerLimit) {
     // The default limit is 1 and that is the win-back card, so the common refusal deserves the
     // plainer wording: "you have already used this" beats "limit reached".

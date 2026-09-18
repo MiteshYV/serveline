@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { boolean, index, integer, pgTable, text, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
 import { createdAt, fk, id, nullableFk, utc } from './_shared.ts'
 import { customer } from './customers.ts'
@@ -63,6 +63,13 @@ export const discountCode = pgTable('discount_code', {
 export const codeRedemption = pgTable('code_redemption', {
   id: id(),
   codeId: fk('code_id').references(() => discountCode.id, { onDelete: 'cascade' }),
+  /**
+   * Copied from the code at redemption time, so the per-restaurant rule below can live in an
+   * index. A unique index cannot reach through a join, and this rule is the one the printed
+   * card promises, so it has to be an index. Never let these disagree with the code row.
+   */
+  restaurantId: fk('restaurant_id').references(() => restaurant.id, { onDelete: 'cascade' }),
+  kind: discountKind('kind').notNull(),
   /** DPDP erasure is a real delete (CLAUDE.md), so an erased customer takes their redemptions. */
   customerId: fk('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
   /** Orders are never deleted; `restrict` states that rather than leaving it to be found out. */
@@ -71,13 +78,22 @@ export const codeRedemption = pgTable('code_redemption', {
   channel: orderChannel('channel').notNull(),
 }, (t) => [
   /**
-   * Build Spec §4 requires this index and §6 says what it is for: "one redemption per phone per
-   * restaurant, enforced by the unique index". It is a correctness boundary, not a lookup — two
-   * checkouts on the same code at the same moment both pass an application-level check, and only
-   * the index refuses the second. The redemption path therefore treats a unique violation as the
-   * "already redeemed" answer rather than as an unexpected error.
+   * Two correctness boundaries, not lookups. Two checkouts at the same moment both pass the
+   * application check in src/core/codes.ts and read zero prior redemptions; only an index
+   * refuses the second. The redemption path treats a unique violation as the "already redeemed"
+   * answer, never as a 500.
+   *
+   * The first is Build Spec §4's index: one redemption of a given code per customer.
+   *
+   * The second is the rule the card actually promises (Ideation §8 flow 5, Build Spec §6): one
+   * win-back redemption per phone per RESTAURANT. A restaurant prints batches (Build Spec §7),
+   * each batch is its own code, and without this a customer holding two cards redeems twice.
+   * Partial, so a `manual` code a staff member hands out is not blocked by an earlier card.
    */
   uniqueIndex('code_redemption_code_customer_uq').on(t.codeId, t.customerId),
+  uniqueIndex('code_redemption_winback_restaurant_customer_uq')
+    .on(t.restaurantId, t.customerId)
+    .where(sql`${t.kind} = 'win_back_card'`),
 ])
 
 export const cardBatchRelations = relations(cardBatch, ({ one, many }) => ({
@@ -94,6 +110,7 @@ export const discountCodeRelations = relations(discountCode, ({ one, many }) => 
 
 export const codeRedemptionRelations = relations(codeRedemption, ({ one }) => ({
   code: one(discountCode, { fields: [codeRedemption.codeId], references: [discountCode.id] }),
+  restaurant: one(restaurant, { fields: [codeRedemption.restaurantId], references: [restaurant.id] }),
   customer: one(customer, { fields: [codeRedemption.customerId], references: [customer.id] }),
   order: one(order, { fields: [codeRedemption.orderId], references: [order.id] }),
 }))

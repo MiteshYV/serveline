@@ -1,5 +1,5 @@
 {
-  "id": "ea23e1ee-5e3e-42ba-b554-d00784f7eccd",
+  "id": "fd6455d5-d1df-4a64-aea4-620ea70644f7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2335,6 +2335,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "restaurant_id": {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "discount_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "customer_id": {
           "name": "customer_id",
           "type": "uuid",
@@ -2383,6 +2396,28 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "code_redemption_winback_restaurant_customer_uq": {
+          "name": "code_redemption_winback_restaurant_customer_uq",
+          "columns": [
+            {
+              "expression": "restaurant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"code_redemption\".\"kind\" = 'win_back_card'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2392,6 +2427,19 @@
           "tableTo": "discount_code",
           "columnsFrom": [
             "code_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "code_redemption_restaurant_id_restaurant_id_fk": {
+          "name": "code_redemption_restaurant_id_restaurant_id_fk",
+          "tableFrom": "code_redemption",
+          "tableTo": "restaurant",
+          "columnsFrom": [
+            "restaurant_id"
           ],
           "columnsTo": [
             "id"

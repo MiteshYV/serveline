@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
-import { NOTICE_VERSION, assertConsentForProfileWrite, hasValidConsent } from './consent.ts'
+import { NOTICE_PURPOSES, NOTICE_VERSION, assertConsentForProfileWrite, hasValidConsent } from './consent.ts'
 import type { ConsentRecordView } from './consent.ts'
 
 const granted = (over: Partial<ConsentRecordView> = {}): ConsentRecordView => ({
@@ -30,12 +31,21 @@ describe('hasValidConsent', () => {
   it('refuses a consent granted against a stale notice version', () => {
     const stale = granted({ noticeVersion: 'v0' })
     assert.equal(hasValidConsent(stale, 'order_fulfilment'), false)
-    assert.equal(hasValidConsent(stale, 'order_fulfilment', 'v0'), true)
+    // Even when v0 is the version being asked about: no notice v0 exists in NOTICE_PURPOSES,
+    // so nothing is known about what it told the customer. Fail closed.
+    assert.equal(hasValidConsent(stale, 'order_fulfilment', 'v0'), false)
   })
 
   it('refuses a purpose the customer did not agree to', () => {
-    assert.equal(hasValidConsent(granted(), 'marketing'), false)
+    assert.equal(hasValidConsent(granted(), 'personalisation'), false)
     assert.equal(hasValidConsent(granted({ purposes: [] }), 'order_fulfilment'), false)
+  })
+
+  // The record says yes, but the notice the customer actually read never mentioned it. This is
+  // the case a stray row or a route bug produces, and it must fail closed.
+  it('refuses a purpose the signed notice version never described', () => {
+    const v0 = granted({ noticeVersion: 'v0', purposes: ['order_fulfilment'] })
+    assert.equal(hasValidConsent(v0, 'order_fulfilment', 'v0'), false)
   })
 
   it('ignores a purposes value outside the union', () => {
@@ -69,4 +79,17 @@ describe('assertConsentForProfileWrite', () => {
       /personalisation/,
     )
   })
+})
+
+// NOTICE_PURPOSES is a literal because core cannot read files. This is what stops it drifting
+// from what the customer was actually shown. All three languages must declare the same set.
+describe('NOTICE_PURPOSES matches the notice frontmatter', () => {
+  for (const lang of ['en', 'hi', 'kn'] as const) {
+    it(`${NOTICE_VERSION}/${lang}.md declares exactly the purposes core enforces`, () => {
+      const md = readFileSync(`contracts/notices/${NOTICE_VERSION}/${lang}.md`, 'utf8')
+      const frontmatter = md.split('---')[1] ?? ''
+      const declared = [...frontmatter.matchAll(/^\s*-\s*(\w+)\s*$/gm)].map((m) => m[1])
+      assert.deepEqual(declared, NOTICE_PURPOSES[NOTICE_VERSION])
+    })
+  }
 })

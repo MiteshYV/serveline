@@ -8,6 +8,7 @@ const RESTAURANT = 'r-1'
 // A live win-back card: 10% off, one per phone, open all December. Ideation §8 flow 5.
 const card = (over: Partial<DiscountCodeRules> = {}): DiscountCodeRules => ({
   restaurantId: RESTAURANT,
+  kind: 'win_back_card',
   percent: 10,
   perCustomerLimit: 1,
   validFrom: new Date('2026-12-01T00:00:00Z'),

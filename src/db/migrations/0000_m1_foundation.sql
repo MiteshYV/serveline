@@ -267,6 +267,8 @@ CREATE TABLE "card_batch" (
 CREATE TABLE "code_redemption" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"code_id" uuid NOT NULL,
+	"restaurant_id" uuid NOT NULL,
+	"kind" "discount_kind" NOT NULL,
 	"customer_id" uuid NOT NULL,
 	"order_id" uuid NOT NULL,
 	"redeemed_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -357,6 +359,7 @@ ALTER TABLE "card_batch" ADD CONSTRAINT "card_batch_restaurant_id_restaurant_id_
 ALTER TABLE "card_batch" ADD CONSTRAINT "card_batch_outlet_id_outlet_id_fk" FOREIGN KEY ("outlet_id") REFERENCES "public"."outlet"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "card_batch" ADD CONSTRAINT "card_batch_audited_by_platform_user_id_fk" FOREIGN KEY ("audited_by") REFERENCES "public"."platform_user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "code_redemption" ADD CONSTRAINT "code_redemption_code_id_discount_code_id_fk" FOREIGN KEY ("code_id") REFERENCES "public"."discount_code"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "code_redemption" ADD CONSTRAINT "code_redemption_restaurant_id_restaurant_id_fk" FOREIGN KEY ("restaurant_id") REFERENCES "public"."restaurant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "code_redemption" ADD CONSTRAINT "code_redemption_customer_id_customer_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customer"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "code_redemption" ADD CONSTRAINT "code_redemption_order_id_order_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."order"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "discount_code" ADD CONSTRAINT "discount_code_restaurant_id_restaurant_id_fk" FOREIGN KEY ("restaurant_id") REFERENCES "public"."restaurant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -386,6 +389,7 @@ CREATE INDEX "order_item_order_idx" ON "order_item" USING btree ("order_id");-->
 CREATE INDEX "payment_order_idx" ON "payment" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "card_batch_restaurant_idx" ON "card_batch" USING btree ("restaurant_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "code_redemption_code_customer_uq" ON "code_redemption" USING btree ("code_id","customer_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "code_redemption_winback_restaurant_customer_uq" ON "code_redemption" USING btree ("restaurant_id","customer_id") WHERE "code_redemption"."kind" = 'win_back_card';--> statement-breakpoint
 CREATE UNIQUE INDEX "discount_code_restaurant_code_uq" ON "discount_code" USING btree ("restaurant_id","code");--> statement-breakpoint
 CREATE INDEX "discount_code_batch_idx" ON "discount_code" USING btree ("batch_id");--> statement-breakpoint
 CREATE INDEX "audit_log_entity_idx" ON "audit_log" USING btree ("entity","entity_id");--> statement-breakpoint
