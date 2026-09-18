@@ -1,0 +1,22 @@
+{
+  "$comment": "Order-state labels shown on chips and the customer status page. State keys match src/db/schema/enums.ts. Labels are the STATE, never the action (design §7.2). Hindi and Kannada are interim, not native-reviewed — see docs/adr/0002 §4. 'ready' is the safety-critical word.",
+  "reviewed": { "en": true, "hi": false, "kn": false },
+  "states": {
+    "received":         { "en": "New",              "hi": "नया ऑर्डर",         "kn": "ಹೊಸ ಆರ್ಡರ್" },
+    "address_pending":  { "en": "Address needed",   "hi": "पता चाहिए",         "kn": "ವಿಳಾಸ ಬೇಕು" },
+    "awaiting_payment": { "en": "Awaiting payment", "hi": "भुगतान बाकी",       "kn": "ಪಾವತಿ ಬಾಕಿ" },
+    "confirmed":        { "en": "Confirmed",        "hi": "पक्का",             "kn": "ಖಚಿತ" },
+    "preparing":        { "en": "Preparing",        "hi": "बन रहा है",         "kn": "ತಯಾರಾಗುತ್ತಿದೆ" },
+    "ready":            { "en": "Ready",            "hi": "तैयार",             "kn": "ಸಿದ್ಧ" },
+    "out_for_delivery": { "en": "On the way",       "hi": "रास्ते में",        "kn": "ದಾರಿಯಲ್ಲಿದೆ" },
+    "delivered":        { "en": "Delivered",        "hi": "पहुँच गया",         "kn": "ತಲುಪಿದೆ" },
+    "cancelled":        { "en": "Cancelled",        "hi": "रद्द",              "kn": "ರದ್ದು" },
+    "needs_attention":  { "en": "Needs attention",  "hi": "ध्यान दें",         "kn": "ಗಮನ ಬೇಕು" }
+  },
+  "delivered_by_fulfilment": {
+    "$comment": "ADR 0002 §6: one state, three labels.",
+    "delivery": { "en": "Delivered", "hi": "पहुँच गया",   "kn": "ತಲುಪಿದೆ" },
+    "pickup":   { "en": "Collected", "hi": "ले लिया गया", "kn": "ಪಡೆಯಲಾಗಿದೆ" },
+    "dine_in":  { "en": "Served",    "hi": "परोस दिया",   "kn": "ಬಡಿಸಲಾಗಿದೆ" }
+  }
+}

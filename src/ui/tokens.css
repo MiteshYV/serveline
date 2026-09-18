@@ -1,0 +1,379 @@
+/* ==========================================================================
+   ServeLine design tokens — Steel & Enamel
+   Source of truth: docs/design/steel-and-enamel.md §12. Every colour pair in
+   there was computed for WCAG 2.2 AA; change a value here and re-run §13.
+   Components read tokens. They never hard-code a colour or a size.
+   ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---- Steel: neutral ramp ------------------------------------------- */
+  --steel-000: #FFFFFF;
+  --steel-025: #F6F8F9;
+  --steel-050: #EDF1F3;
+  --steel-100: #E1E7EA;
+  --steel-200: #CBD5DA;
+  --steel-300: #AAB8C0;
+  --steel-400: #85949E;
+  --steel-500: #667681;
+  --steel-600: #4F5E68;
+  --steel-700: #3A474F;
+  --steel-800: #28333A;
+  --steel-900: #192227;
+  --steel-950: #0F171B;
+
+  /* ---- Semantic surfaces & text -------------------------------------- */
+  --bg-app:        var(--steel-050);
+  --bg-card:       var(--steel-000);
+  --bg-raised:     var(--steel-000);
+  --bg-sunken:     var(--steel-100);
+  --bg-inverse:    var(--steel-900);
+
+  --text-primary:   var(--steel-900);   /* 16.16:1 on card */
+  --text-secondary: var(--steel-600);   /*  6.70:1 */
+  --text-tertiary:  var(--steel-500);   /*  4.69:1 */
+  --text-inverse:   var(--steel-000);
+  --text-disabled:  var(--steel-400);   /* SC 1.4.3 exempts disabled */
+
+  --border-separator: var(--steel-200); /* decorative only */
+  --border-subtle:    var(--steel-300); /* non-semantic only */
+  --border-control:   var(--steel-400); /* 3.12:1 — SC 1.4.11 floor */
+  --border-strong:    var(--steel-500);
+
+  /* ---- Action: colour is never a button ------------------------------ */
+  --action-fill:       var(--steel-900);
+  --action-on:         var(--steel-000);   /* 16.16:1 */
+  --action-fill-hover: var(--steel-800);
+  --action-ghost-ink:  var(--steel-800);
+
+  /* ---- State enamel: reserved by law --------------------------------- */
+  --state-received-ink:    #0B5FA5;  /* 6.57 card / 5.78 app */
+  --state-received-plate:  #0E6FBE;
+  --state-received-on:     #FFFFFF;  /* 5.20 on plate */
+  --state-received-wash:   #E4F0FA;
+
+  --state-preparing-ink:   #6E5208;  /* 7.31 / 6.43  — brass, ΔEok 0.30 from Swiggy */
+  --state-preparing-plate: #8A6508;
+  --state-preparing-on:    #FFFFFF;  /* 5.32 */
+  --state-preparing-wash:  #F7EFDB;
+
+  --state-ready-ink:       #10704A;  /* 6.11 / 5.37 */
+  --state-ready-plate:     #128054;
+  --state-ready-on:        #FFFFFF;  /* 4.95 */
+  --state-ready-wash:      #E1F4EC;
+
+  --state-delivered-ink:   #4F5E68;  /* 6.70 / 5.90 — drained to steel */
+  --state-delivered-plate: #E1E7EA;
+  --state-delivered-on:    #28333A;  /* 10.35 */
+  --state-delivered-wash:  #EDF1F3;
+
+  --state-attention-ink:   #8F0E35;  /* 9.20 / 8.10 — oxblood, not Zomato red */
+  --state-attention-plate: #A11240;
+  --state-attention-on:    #FFFFFF;  /* 7.85 */
+  --state-attention-wash:  #FCE7EC;
+
+  --state-cancelled-ink:   #5C6770;  /* 5.79 / 5.09 */
+  --state-cancelled-plate: #E1E7EA;
+  --state-cancelled-on:    #28333A;  /* 10.35 */
+  --state-cancelled-wash:  #EDF1F3;
+
+  /* ---- FSSAI marks (regulated, not decorative) ----------------------- */
+  --fssai-veg:    #128054;  /* 4.95 on card */
+  --fssai-nonveg: #7A3B12;  /* 8.53 on card */
+
+  /* ---- Brand: normalised at onboarding, never raw -------------------- */
+  /* Fallback = steel. Overridden per restaurant by an inline block. */
+  --brand-fill: var(--steel-900);
+  --brand-on:   var(--steel-000);
+  --brand-ink:  var(--steel-800);
+  --brand-wash: var(--steel-050);
+  --brand-edge: var(--brand-ink);
+
+  /* ---- Focus: brand-independent dual-tone ---------------------------- */
+  --focus-inner: #FFFFFF;
+  --focus-outer: #192227;
+
+  /* ---- Type ----------------------------------------------------------- */
+  --font-ui:
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Noto Sans", "Noto Sans Devanagari", "Noto Sans Kannada",
+    "Nirmala UI", "Kohinoor Devanagari", "Kannada Sangam MN",
+    Arial, sans-serif;
+  --font-numeric:
+    Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "Roboto Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-micro:     0.6875rem; /* 11 */
+  --fs-caption:   0.75rem;   /* 12 */
+  --fs-small:     0.8125rem; /* 13 */
+  --fs-base-s:    0.875rem;  /* 14 */
+  --fs-base:      1rem;      /* 16 */
+  --fs-base-l:    1.125rem;  /* 18 */
+  --fs-title-s:   1.25rem;   /* 20 */
+  --fs-title:     1.5rem;    /* 24 */
+  --fs-title-l:   1.75rem;   /* 28 */
+  --fs-display-s: 2.125rem;  /* 34 */
+  --fs-display:   2.625rem;  /* 42 */
+  --fs-display-l: 3.5rem;    /* 56 */
+
+  --fw-regular: 400;
+  --fw-medium:  500;  /* Latin-only content */
+  --fw-semi:    600;  /* Latin-only content */
+  --fw-bold:    700;
+
+  --lh-tight: 1.30;   /* Latin-only numerals and IDs */
+  --lh-ui:    1.45;   /* anything translatable — hard floor */
+  --lh-body:  1.60;
+
+  /* Density defaults = comfort (customer). See [data-density] below. */
+  --text-display:  var(--fs-title-l);   /* 28 */
+  --text-title:    var(--fs-title-s);   /* 20 */
+  --text-subtitle: var(--fs-base-l);    /* 18 */
+  --text-body:     var(--fs-base);      /* 16 */
+  --text-label:    var(--fs-base-s);    /* 14 */
+  --text-caption:  var(--fs-small);     /* 13 */
+
+  /* ---- Space ---------------------------------------------------------- */
+  --space-2: 2px;   --space-4: 4px;   --space-6: 6px;   --space-8: 8px;
+  --space-12: 12px; --space-16: 16px; --space-20: 20px; --space-24: 24px;
+  --space-32: 32px; --space-40: 40px; --space-48: 48px; --space-64: 64px;
+
+  /* ---- Radius: plates, not pills -------------------------------------- */
+  --radius-1: 2px;
+  --radius-2: 4px;   /* status chips */
+  --radius-3: 6px;   /* buttons, inputs */
+  --radius-4: 8px;   /* cards */
+  --radius-5: 12px;  /* sheets, modals */
+  --radius-full: 999px; /* avatar + count badge ONLY */
+
+  /* ---- Elevation ------------------------------------------------------ */
+  --elev-0: none;
+  --elev-1: 0 1px 1px rgba(15,23,27,.04), 0 0 0 1px rgba(15,23,27,.06);
+  --elev-2: 0 1px 2px rgba(15,23,27,.10), 0 2px 8px rgba(15,23,27,.08);
+  --elev-3: 0 8px 24px rgba(15,23,27,.16), 0 2px 6px rgba(15,23,27,.10);
+  --bevel:  inset 0 1px 0 rgba(255,255,255,.7);
+
+  /* ---- Touch targets -------------------------------------------------- */
+  --touch-min:     44px;  /* customer */
+  --touch-counter: 56px;  /* dashboard */
+  --touch-dense:   32px;  /* agent console, mouse */
+  --row-counter:   64px;
+
+  /* ---- Motion --------------------------------------------------------- */
+  --dur-1: 100ms;
+  --dur-2: 160ms;
+  --dur-3: 220ms;
+  --dur-4: 300ms;
+  --ease-out:   cubic-bezier(0.2, 0, 0, 1);
+  --ease-in:    cubic-bezier(0.4, 0, 1, 1);
+  --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-snap:  cubic-bezier(0.3, 0, 0.1, 1);
+}
+
+/* ==========================================================================
+   DARK — roles are re-pointed, not mirrored. Do not pair by ramp number.
+   ========================================================================== */
+
+:root[data-theme="dark"] {
+  --bg-app:    var(--steel-950);
+  --bg-card:   var(--steel-900);
+  --bg-raised: var(--steel-800);
+  --bg-sunken: #0A1014;
+  --bg-inverse: var(--steel-025);
+
+  --text-primary:   var(--steel-100);  /* 14.52:1 on app */
+  --text-secondary: var(--steel-300);  /*  8.91:1 */
+  --text-tertiary:  var(--steel-400);  /*  5.81:1 */
+  --text-inverse:   var(--steel-950);
+  --text-disabled:  var(--steel-600);
+
+  --border-separator: var(--steel-700);
+  --border-subtle:    var(--steel-600);
+  --border-control:   var(--steel-500); /* 3.44:1 */
+  --border-strong:    var(--steel-400);
+
+  --action-fill:       var(--steel-025);
+  --action-on:         var(--steel-950); /* 17.01:1 */
+  --action-fill-hover: var(--steel-100);
+  --action-ghost-ink:  var(--steel-200);
+
+  --state-received-ink:    #6FB8F5;  /* 7.58 card / 8.50 app / 6.06 raised */
+  --state-received-plate:  #12557F;
+  --state-received-on:     #FFFFFF;  /* 7.98 */
+  --state-received-wash:   #10273A;
+
+  --state-preparing-ink:   #E8B857;  /* 8.79 / 9.86 / 7.03 */
+  --state-preparing-plate: #5E3C07;
+  --state-preparing-on:    #FFFFFF;  /* 9.88 */
+  --state-preparing-wash:  #2E2109;
+
+  --state-ready-ink:       #4FC894;  /* 7.71 / 8.65 / 6.17 */
+  --state-ready-plate:     #0C5738;
+  --state-ready-on:        #FFFFFF;  /* 8.62 */
+  --state-ready-wash:      #0D2E22;
+
+  --state-delivered-ink:   #AAB8C0;  /* 7.95 / 8.91 / 6.36 */
+  --state-delivered-plate: #3A474F;
+  --state-delivered-on:    #FFFFFF;  /* 9.57 */
+  --state-delivered-wash:  #1C262C;
+
+  --state-attention-ink:   #FF9FB0;  /* 8.34 / 9.35 / 6.67 */
+  --state-attention-plate: #8E0F2B;
+  --state-attention-on:    #FFFFFF;  /* 9.32 */
+  --state-attention-wash:  #33101C;
+
+  --state-cancelled-ink:   #99A4AD;  /* 6.36 / 7.14 / 5.09 */
+  --state-cancelled-plate: #28333A;
+  --state-cancelled-on:    #E1E7EA;  /* 10.35 */
+  --state-cancelled-wash:  #1C262C;
+
+  --fssai-veg:    #4FC894;  /* 7.71 on card */
+  --fssai-nonveg: #D18A5A;  /* 5.77 on card */
+
+  --brand-fill: var(--steel-025);
+  --brand-on:   var(--steel-950);
+  --brand-ink:  var(--steel-200);
+  --brand-wash: var(--steel-800);
+
+  --focus-inner: #0F171B;
+  --focus-outer: #E1E7EA;
+
+  /* Seams, not shadows. */
+  --elev-1: 0 0 0 1px #3A474F;
+  --elev-2: 0 0 0 1px #3A474F, 0 2px 8px rgba(0,0,0,.50);
+  --elev-3: 0 0 0 1px #4F5E68, 0 12px 32px rgba(0,0,0,.65);
+  --bevel:  none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-app:    var(--steel-950);
+    --bg-card:   var(--steel-900);
+    --bg-raised: var(--steel-800);
+    --bg-sunken: #0A1014;
+    --bg-inverse: var(--steel-025);
+
+    --text-primary:   var(--steel-100);
+    --text-secondary: var(--steel-300);
+    --text-tertiary:  var(--steel-400);
+    --text-inverse:   var(--steel-950);
+    --text-disabled:  var(--steel-600);
+
+    --border-separator: var(--steel-700);
+    --border-subtle:    var(--steel-600);
+    --border-control:   var(--steel-500);
+    --border-strong:    var(--steel-400);
+
+    --action-fill:       var(--steel-025);
+    --action-on:         var(--steel-950);
+    --action-fill-hover: var(--steel-100);
+    --action-ghost-ink:  var(--steel-200);
+
+    --state-received-ink:    #6FB8F5;
+    --state-received-plate:  #12557F;
+    --state-received-on:     #FFFFFF;
+    --state-received-wash:   #10273A;
+    --state-preparing-ink:   #E8B857;
+    --state-preparing-plate: #5E3C07;
+    --state-preparing-on:    #FFFFFF;
+    --state-preparing-wash:  #2E2109;
+    --state-ready-ink:       #4FC894;
+    --state-ready-plate:     #0C5738;
+    --state-ready-on:        #FFFFFF;
+    --state-ready-wash:      #0D2E22;
+    --state-delivered-ink:   #AAB8C0;
+    --state-delivered-plate: #3A474F;
+    --state-delivered-on:    #FFFFFF;
+    --state-delivered-wash:  #1C262C;
+    --state-attention-ink:   #FF9FB0;
+    --state-attention-plate: #8E0F2B;
+    --state-attention-on:    #FFFFFF;
+    --state-attention-wash:  #33101C;
+    --state-cancelled-ink:   #99A4AD;
+    --state-cancelled-plate: #28333A;
+    --state-cancelled-on:    #E1E7EA;
+    --state-cancelled-wash:  #1C262C;
+
+    --fssai-veg:    #4FC894;
+    --fssai-nonveg: #D18A5A;
+
+    --brand-fill: var(--steel-025);
+    --brand-on:   var(--steel-950);
+    --brand-ink:  var(--steel-200);
+    --brand-wash: var(--steel-800);
+
+    --focus-inner: #0F171B;
+    --focus-outer: #E1E7EA;
+
+    --elev-1: 0 0 0 1px #3A474F;
+    --elev-2: 0 0 0 1px #3A474F, 0 2px 8px rgba(0,0,0,.50);
+    --elev-3: 0 0 0 1px #4F5E68, 0 12px 32px rgba(0,0,0,.65);
+    --bevel:  none;
+  }
+}
+
+/* ==========================================================================
+   DENSITY — one scale, three modes.
+   ========================================================================== */
+
+:root[data-density="counter"] {
+  --text-display:  var(--fs-display-s); /* 34 */
+  --text-title:    var(--fs-title);     /* 24 */
+  --text-subtitle: var(--fs-title-s);   /* 20 */
+  --text-body:     var(--fs-base-l);    /* 18 */
+  --text-label:    var(--fs-base);      /* 16 */
+  --text-caption:  var(--fs-base-s);    /* 14 — hard floor */
+}
+
+:root[data-density="dense"] {
+  --text-display:  var(--fs-title-s);   /* 20 */
+  --text-title:    var(--fs-base-l);    /* 18 */
+  --text-subtitle: var(--fs-base);      /* 16 */
+  --text-body:     var(--fs-base-s);    /* 14 */
+  --text-label:    var(--fs-small);     /* 13 */
+  --text-caption:  var(--fs-caption);   /* 12 */
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+html { font-size: 16px; }
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Numerals never inherit a Devanagari/Kannada fallback's proportional figures. */
+.num, [data-num] {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-inner), 0 0 0 4px var(--focus-outer);
+  border-radius: inherit;
+}
+
+@media (prefers-contrast: more) {
+  :root { --border-control: var(--steel-500); --border-separator: var(--steel-400); }
+  :root[data-theme="dark"] { --border-control: var(--steel-400); --border-separator: var(--steel-500); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
