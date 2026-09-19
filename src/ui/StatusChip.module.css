@@ -1,0 +1,58 @@
+/* Design §7.2. Heights 24 (dense) / 28 (comfort) / 32 (counter); no token covers 28, so it is
+   the one literal here. Horizontal padding 8px, 10px at counter. */
+.chip {
+  --chip-h: 28px;
+  --chip-px: var(--space-8);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--chip-h);
+  padding: 0 var(--chip-px);
+  border-radius: var(--radius-2);
+  border: 1px solid transparent;
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+[data-density="counter"] .chip {
+  --chip-h: var(--space-32);
+  --chip-px: calc(var(--space-8) + var(--space-2));
+}
+
+[data-density="dense"] .chip {
+  --chip-h: var(--space-24);
+}
+
+/* Translated label: 700 only, no tracking, no transform (design §4.2). */
+.label {
+  font-weight: var(--fw-bold);
+}
+
+/* ---- filled: plate + on. Counter dashboard only. ---- */
+.filled[data-tone="received"]   { background: var(--state-received-plate);   color: var(--state-received-on); }
+.filled[data-tone="preparing"]  { background: var(--state-preparing-plate);  color: var(--state-preparing-on); }
+.filled[data-tone="ready"]      { background: var(--state-ready-plate);      color: var(--state-ready-on); }
+.filled[data-tone="delivered"]  { background: var(--state-delivered-plate);  color: var(--state-delivered-on); }
+.filled[data-tone="attention"]  { background: var(--state-attention-plate);  color: var(--state-attention-on); }
+.filled[data-tone="cancelled"]  { background: var(--state-cancelled-plate);  color: var(--state-cancelled-on); }
+
+/* ---- outline: 1px ink border, wash fill, ink text. Customer surface, always; dense tables. ---- */
+.outline[data-tone="received"]  { background: var(--state-received-wash);  color: var(--state-received-ink);  border-color: var(--state-received-ink); }
+.outline[data-tone="preparing"] { background: var(--state-preparing-wash); color: var(--state-preparing-ink); border-color: var(--state-preparing-ink); }
+.outline[data-tone="ready"]     { background: var(--state-ready-wash);     color: var(--state-ready-ink);     border-color: var(--state-ready-ink); }
+.outline[data-tone="delivered"] { background: var(--state-delivered-wash); color: var(--state-delivered-ink); border-color: var(--state-delivered-ink); }
+.outline[data-tone="attention"] { background: var(--state-attention-wash); color: var(--state-attention-ink); border-color: var(--state-attention-ink); }
+.outline[data-tone="cancelled"] { background: var(--state-cancelled-wash); color: var(--state-cancelled-ink); border-color: var(--state-cancelled-ink); }
+
+/* Design §9: under prefers-contrast: more every chip becomes the filled variant. */
+@media (prefers-contrast: more) {
+  .outline[data-tone="received"]  { background: var(--state-received-plate);  color: var(--state-received-on);  border-color: transparent; }
+  .outline[data-tone="preparing"] { background: var(--state-preparing-plate); color: var(--state-preparing-on); border-color: transparent; }
+  .outline[data-tone="ready"]     { background: var(--state-ready-plate);     color: var(--state-ready-on);     border-color: transparent; }
+  .outline[data-tone="delivered"] { background: var(--state-delivered-plate); color: var(--state-delivered-on); border-color: transparent; }
+  .outline[data-tone="attention"] { background: var(--state-attention-plate); color: var(--state-attention-on); border-color: transparent; }
+  .outline[data-tone="cancelled"] { background: var(--state-cancelled-plate); color: var(--state-cancelled-on); border-color: transparent; }
+}

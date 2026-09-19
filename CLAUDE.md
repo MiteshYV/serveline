@@ -42,6 +42,8 @@ Current milestone: **M1** — ordering page and dashboard, no AI. See Build Spec
   free of anything web-shaped.
 - `src/db/` — Drizzle schema, migrations, seed, and the repository functions.
 - `src/adapters/` — one folder per vendor concern. Interface, mock, and (later) the real client.
+- `src/auth/` — OTP challenges and session cookies. Stateless by design at M1: the OTP lives in a
+  signed challenge, not a table, because Build Spec §10 gives it a ten-minute life and nothing else.
 - `src/ui/` — design tokens and shared components. Tokens are CSS custom properties; do not
   hard-code a colour or a spacing value in a component.
 - `app/` — routes only. Thin. Business rules belong in `src/core/`.

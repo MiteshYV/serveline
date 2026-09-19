@@ -318,7 +318,7 @@
    DENSITY — one scale, three modes.
    ========================================================================== */
 
-:root[data-density="counter"] {
+:root[data-density="counter"], [data-density="counter"] {
   --text-display:  var(--fs-display-s); /* 34 */
   --text-title:    var(--fs-title);     /* 24 */
   --text-subtitle: var(--fs-title-s);   /* 20 */
@@ -327,7 +327,7 @@
   --text-caption:  var(--fs-base-s);    /* 14 — hard floor */
 }
 
-:root[data-density="dense"] {
+:root[data-density="dense"], [data-density="dense"] {
   --text-display:  var(--fs-title-s);   /* 20 */
   --text-title:    var(--fs-base-l);    /* 18 */
   --text-subtitle: var(--fs-base);      /* 16 */

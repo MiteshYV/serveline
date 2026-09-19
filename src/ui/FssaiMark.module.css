@@ -1,0 +1,8 @@
+.mark {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+
+.veg    { color: var(--fssai-veg); }
+.nonveg { color: var(--fssai-nonveg); }

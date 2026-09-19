@@ -1,0 +1,23 @@
+/* Tailwind is layered (@layer base/components/utilities); tokens.css is not, so the design system
+   always wins over preflight. Tailwind is for page layout in app/ only — components under src/ui
+   read tokens through their own CSS modules and never use a utility class. */
+@import "tailwindcss";
+@import "../src/ui/tokens.css";
+
+/* Preflight fades placeholders to 50% currentColor, which fails contrast. Design §3.1: steel-500. */
+::placeholder {
+  color: var(--text-tertiary);
+  opacity: 1;
+}
+
+/* SC 2.4.11: the fixed cart bar and the alert band must never cover a focused element. */
+:focus-visible {
+  scroll-margin-block: var(--space-64);
+}
+
+/* Design §8: no skeleton shimmer. A static block reads as loading perfectly well. */
+.loading-block {
+  background: var(--bg-sunken);
+  border-radius: var(--radius-2);
+  min-height: 1em;
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { applyPercentDiscount, formatINR, paise } from './money.ts'
+import { applyPercentDiscount, formatINR, paise, parseINR } from './money.ts'
 
 test('paise accepts whole paise, including zero and a negative price delta', () => {
   assert.equal(paise(0), 0)
@@ -53,4 +53,18 @@ test('applyPercentDiscount rejects a percent the discount_code column cannot hol
 
 test('applyPercentDiscount rejects a negative subtotal', () => {
   assert.throws(() => applyPercentDiscount(paise(-100), 10), RangeError)
+})
+
+test('parseINR turns typed rupees into paise without a float', () => {
+  assert.equal(parseINR('240'), 24000)
+  assert.equal(parseINR('240.5'), 24050)
+  assert.equal(parseINR('₹1,200.00'), 120000)
+  assert.equal(parseINR('-90'), -9000)          // a half-plate variant delta
+  assert.equal(parseINR(' 12.99 '), 1299)
+})
+
+test('parseINR refuses what is not a rupee amount', () => {
+  for (const bad of ['', 'abc', '1.234', '1e3', '99999999']) {
+    assert.throws(() => parseINR(bad), TypeError, bad)
+  }
 })

@@ -1,0 +1,69 @@
+.wrap {
+  --h: var(--touch-min);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.customer { --h: var(--touch-min); }
+.counter  { --h: var(--touch-counter); }
+
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  height: var(--h);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h);
+  border: 0;
+  background: transparent;
+  color: var(--action-ghost-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.btn:active {
+  transform: scale(0.94);
+}
+
+.btn[aria-disabled="true"] {
+  color: var(--text-disabled);
+}
+
+/* min-width 44 with tabular figures, so 9 → 10 does not shift the row (design §7.7). */
+.number {
+  min-width: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-inline: 1px solid var(--border-separator);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--fw-semi);
+  text-align: center;
+  cursor: text;
+}
+
+.input {
+  width: var(--touch-min);
+  border-radius: 0;
+  outline: none;
+}
+
+.max {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}

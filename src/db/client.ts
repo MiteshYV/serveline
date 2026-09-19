@@ -30,9 +30,17 @@ function open() {
 }
 
 // Next.js dev reloads modules; keep one instance across reloads or PGlite opens the same
-// directory twice and locks.
+// directory twice and locks. Opened on first use, not on import: `next build` evaluates every
+// server module while collecting page data, and PGlite's WASM cannot initialise in that worker.
 const g = globalThis as unknown as { __serveline_db?: ReturnType<typeof open> }
-export const db = (g.__serveline_db ??= open())
+const get = () => (g.__serveline_db ??= open())
 
-export type Db = typeof db
+export type Db = ReturnType<typeof open>
+export const db: Db = new Proxy({} as Db, {
+  get: (_t, prop) => {
+    const real = get()
+    const v = Reflect.get(real, prop)
+    return typeof v === 'function' ? v.bind(real) : v // drizzle's methods rely on `this`
+  },
+})
 export { schema }

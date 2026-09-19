@@ -1,0 +1,52 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.label {
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  color: var(--text-primary);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+/* Design §7.10.3: attention ink, wired to the input; the field keeps its value. */
+.error {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--state-attention-ink);
+}
+
+/* Shared text-control skin (design §7.5, §5.4): 56px tall, control border at the SC 1.4.11
+   floor, --radius-3, ≥16px text so mobile browsers do not zoom on focus. PhoneInput, OtpInput
+   and any plain <input> in a page apply this alongside their own class. */
+.control {
+  width: 100%;
+  min-height: var(--touch-counter);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-base-l);
+  line-height: var(--lh-ui);
+}
+
+.control[aria-invalid="true"] {
+  border-color: var(--state-attention-ink);
+}
+
+.control:disabled {
+  background: var(--bg-sunken);
+  color: var(--text-disabled);
+}

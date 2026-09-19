@@ -1,0 +1,277 @@
+/* Design §7.1. Width: full bleed minus the board's 12px gutters (the board owns the gutter). */
+.card {
+  --edge: var(--border-control);
+  --wash: var(--bg-sunken);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-height: 104px;
+  padding: var(--space-12) var(--space-12) var(--space-12) calc(var(--space-16) + var(--space-4));
+  background: var(--bg-card);
+  border-radius: var(--radius-4);
+  box-shadow: var(--elev-1);
+  overflow: hidden; /* clips the edge to the 8px radius */
+  line-height: var(--lh-ui);
+}
+
+/* The enamel plate: 4px, full height, always the state's INK (≥3:1 in both themes, §5.4). */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--space-4);
+  background: var(--edge);
+}
+
+/* Signature bevel on the top edge (§5.3); a pseudo so dark's `none` stays valid. */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--bevel);
+  pointer-events: none;
+}
+
+.card[data-tone="received"]  { --edge: var(--state-received-ink);  --wash: var(--state-received-wash); }
+.card[data-tone="preparing"] { --edge: var(--state-preparing-ink); --wash: var(--state-preparing-wash); }
+.card[data-tone="ready"]     { --edge: var(--state-ready-ink);     --wash: var(--state-ready-wash); }
+.card[data-tone="delivered"] { --edge: var(--state-delivered-ink); --wash: var(--state-delivered-wash); }
+.card[data-tone="attention"] { --edge: var(--state-attention-ink); --wash: var(--state-attention-wash); }
+.card[data-tone="cancelled"] { --edge: var(--state-cancelled-ink); --wash: var(--state-cancelled-wash); }
+
+/* Delivered / cancelled: drained, no action bar, collapsed to the 64px counter row. */
+.card[data-collapsed] {
+  min-height: var(--row-counter);
+  justify-content: center;
+  gap: 0;
+}
+
+/* Micro-label, but never below the 14px counter floor (§4.4). Translated: no transform. */
+.pinned {
+  align-self: flex-start;
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+}
+
+/* ---- Scan layer (65 cm) ---- */
+.scan {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.number {
+  font-size: var(--fs-display-s); /* 34/700 */
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.card[data-collapsed] .number {
+  font-size: var(--fs-title); /* 24 in the drained row */
+}
+
+.timer {
+  margin-left: auto;
+  font-size: var(--fs-title-s); /* 20/600 */
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.total {
+  margin-left: auto;
+  font-size: var(--fs-base-l);
+  font-weight: var(--fw-semi);
+  white-space: nowrap;
+}
+
+.locator {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+/* Latin-only system label, so tracking and uppercase are legal here (§4.2, §7.1). */
+.locLabel {
+  font-size: var(--fs-base); /* 16/700 */
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.locNumber {
+  font-size: var(--fs-title); /* 24/700 — the table number (§4.5) */
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+.locArea {
+  font-size: var(--text-body);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel {
+  margin-left: auto;
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* ---- Lean-in layer (40 cm). The row is the expand control; it is a 44px target. ---- */
+.leanIn {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.leanTotal {
+  font-weight: var(--fw-medium);
+}
+
+.sep {
+  color: var(--text-tertiary);
+}
+
+.payment {
+  color: var(--text-secondary);
+}
+
+.chevron {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-tertiary);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.chevron[data-open] {
+  transform: rotate(180deg);
+}
+
+/* Expanded detail sits on the state's wash — "a tint ground for expanded detail" (§3.2). */
+.detail {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-2);
+  background: var(--wash);
+}
+
+.items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--text-label);
+}
+
+.qty {
+  font-weight: var(--fw-semi);
+}
+
+.note {
+  margin: var(--space-8) 0 0;
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+/* needs_attention: a 32px band above the action bar carrying the reason (§7.1). */
+.band {
+  display: flex;
+  align-items: center;
+  min-height: var(--space-32);
+  margin: 0;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-2);
+  background: var(--state-attention-wash);
+  color: var(--state-attention-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+}
+
+/* ---- Action bar: ONE primary, 56px, plus the 56×56 ⋯ at the right, 16px apart. ---- */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  margin-top: var(--space-4);
+}
+
+.actions > :first-child:not(.more) {
+  flex: 1;
+}
+
+.more {
+  flex: none;
+  margin-left: auto;
+  width: var(--touch-counter);
+  height: var(--touch-counter);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  color: var(--action-ghost-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.more:active {
+  transform: scale(0.96);
+}
+
+/* Failed to sync (§7.10.2): the primary becomes the retry, in attention ink on the card ground. */
+.retry {
+  color: var(--state-attention-ink);
+  border-color: var(--state-attention-ink);
+}
+
+/* ⋯ menu: every entry 56px, 16px gaps; cancel last, never adjacent to the primary. */
+.menu,
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--border-separator);
+}
+
+.cancelEntry {
+  color: var(--state-attention-ink);
+}
+
+.confirmTitle {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--fw-bold);
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-16);
+}
+
+.confirmActions > * {
+  flex: 1;
+}

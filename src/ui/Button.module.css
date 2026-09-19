@@ -1,0 +1,80 @@
+.btn {
+  --h: var(--touch-min);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: var(--h);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-3);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Design §8: transform only, press feedback at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: default;
+  background: var(--bg-sunken);
+  color: var(--text-disabled);
+  border-color: transparent;
+}
+
+/* Signature bevel (design §5.3) lives on a pseudo-element because `--bevel` is `none` in dark,
+   and `none` cannot be joined to another shadow in one declaration. */
+.primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--bevel);
+  pointer-events: none;
+}
+
+.customer { --h: var(--touch-min); }
+.counter  { --h: var(--touch-counter); }
+.dense    { --h: var(--touch-dense); padding-inline: var(--space-12); }
+
+.block {
+  display: flex;
+  width: 100%;
+}
+
+/* ---- variants ---- */
+.primary {
+  background: var(--action-fill);
+  color: var(--action-on);
+}
+@media (hover: hover) {
+  .primary:hover:not(:disabled) { background: var(--action-fill-hover); }
+}
+
+.ghost {
+  background: transparent;
+  color: var(--action-ghost-ink);
+  border-color: var(--border-control);
+}
+
+.brand {
+  background: var(--brand-fill);
+  color: var(--brand-on);
+}
+
+.danger {
+  background: var(--state-attention-plate);
+  color: var(--state-attention-on);
+}

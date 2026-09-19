@@ -1,0 +1,138 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { z } from 'zod'
+import { publishMenu, setItemAvailability, upsertItem, type UpsertItemInput } from '@/db/repos/index.ts'
+import { currentOutlet } from '../../_lib/session.ts'
+import { parseINR } from '@/core/money.ts'
+
+/** Build Spec §7 "Menu: availability toggles per item (sold out today)". Live at once; no publish needed. */
+export async function setAvailability(form: FormData): Promise<void> {
+  const parsed = z.object({ itemId: z.uuid(), available: z.enum(['0', '1']) }).safeParse({ itemId: form.get('itemId'), available: form.get('available') })
+  if (!parsed.success) return
+  const { actor } = await currentOutlet()
+  await setItemAvailability(parsed.data.itemId, parsed.data.available === '1', actor)
+  revalidatePath('/app/menu')
+  revalidatePath('/app/orders/new')
+}
+
+/** Build Spec §7: "Publishing bumps menu.version and refreshes the voice cache." */
+export async function publish(): Promise<void> {
+  const { outlet, actor } = await currentOutlet()
+  await publishMenu(outlet.id, actor)
+  revalidatePath('/app/menu')
+}
+
+/** Form fields arrive as rupees; core's parseINR is the one rupee→paise conversion. Null, not a throw: the form shows a field error. */
+const parseRupees = (raw: string): number | null => {
+  try { return parseINR(raw) } catch { return null }
+}
+
+export type ItemFormState = { error?: string; fieldErrors?: Record<string, string> }
+
+const Item = z.object({
+  id: z.uuid().optional(),
+  categoryId: z.uuid(),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500),
+  pricePaise: z.number().int().min(0),
+  isVeg: z.boolean(),
+  spiceLevel: z.enum(['none', 'mild', 'medium', 'hot']),
+  isAvailable: z.boolean(),
+  variants: z.array(z.object({ id: z.uuid().optional(), name: z.string().trim().min(1).max(60), priceDeltaPaise: z.number().int() })),
+  optionGroups: z.array(z.object({
+    id: z.uuid().optional(),
+    name: z.string().trim().min(1).max(60),
+    minSelect: z.number().int().min(0).max(20),
+    maxSelect: z.number().int().min(1).max(20),
+    options: z.array(z.object({ id: z.uuid().optional(), name: z.string().trim().min(1).max(60), priceDeltaPaise: z.number().int() })).min(1),
+  })),
+})
+
+const MAX_VARIANTS = 6
+const MAX_GROUPS = 3
+const MAX_OPTIONS = 6
+
+const str = (form: FormData, key: string) => (typeof form.get(key) === 'string' ? (form.get(key) as string) : '')
+const optionalId = (v: string) => (v ? v : undefined)
+
+/**
+ * Build Spec §7 "item add and edit with variants and options". The form is a fixed grid of rows;
+ * a row with an empty name is an empty row and is dropped, which is how a variant or option is
+ * removed too. Ids travel in hidden fields so the repository can diff children.
+ */
+export async function saveItem(_prev: ItemFormState, form: FormData): Promise<ItemFormState> {
+  const fieldErrors: Record<string, string> = {}
+  const price = parseRupees(str(form, 'price'))
+  if (price === null || price < 0) fieldErrors.price = 'Enter a price in rupees, like 240 or 240.50'
+
+  const variants: NonNullable<UpsertItemInput['variants']> = []
+  for (let i = 0; i < MAX_VARIANTS; i += 1) {
+    const name = str(form, `variant[${i}].name`).trim()
+    if (!name) continue
+    const delta = parseRupees(str(form, `variant[${i}].delta`) || '0')
+    if (delta === null) {
+      fieldErrors[`variant[${i}].delta`] = 'Enter a rupee amount; negative for a smaller portion'
+      continue
+    }
+    variants.push({ id: optionalId(str(form, `variant[${i}].id`)), name, priceDeltaPaise: delta })
+  }
+
+  const optionGroups: NonNullable<UpsertItemInput['optionGroups']> = []
+  for (let g = 0; g < MAX_GROUPS; g += 1) {
+    const name = str(form, `group[${g}].name`).trim()
+    if (!name) continue
+    const options: { id?: string; name: string; priceDeltaPaise: number }[] = []
+    for (let o = 0; o < MAX_OPTIONS; o += 1) {
+      const oname = str(form, `group[${g}].option[${o}].name`).trim()
+      if (!oname) continue
+      const delta = parseRupees(str(form, `group[${g}].option[${o}].delta`) || '0')
+      if (delta === null) {
+        fieldErrors[`group[${g}].option[${o}].delta`] = 'Enter a rupee amount'
+        continue
+      }
+      options.push({ id: optionalId(str(form, `group[${g}].option[${o}].id`)), name: oname, priceDeltaPaise: delta })
+    }
+    const minSelect = Number(str(form, `group[${g}].min`) || '0')
+    const maxSelect = Number(str(form, `group[${g}].max`) || '1')
+    if (options.length === 0) fieldErrors[`group[${g}].name`] = 'A group needs at least one option'
+    if (!(minSelect <= maxSelect)) fieldErrors[`group[${g}].min`] = 'Minimum cannot exceed maximum'
+    optionGroups.push({ id: optionalId(str(form, `group[${g}].id`)), name, minSelect, maxSelect, options })
+  }
+
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
+
+  const parsed = Item.safeParse({
+    id: optionalId(str(form, 'id')),
+    categoryId: str(form, 'categoryId'),
+    name: str(form, 'name'),
+    description: str(form, 'description'),
+    pricePaise: price,
+    isVeg: form.get('isVeg') === 'on',
+    spiceLevel: str(form, 'spiceLevel') || 'none',
+    isAvailable: form.get('isAvailable') === 'on',
+    variants,
+    optionGroups,
+  })
+  if (!parsed.success) {
+    const first = parsed.error.issues[0]
+    return { error: first ? `${first.path.join('.')}: ${first.message}` : 'Check the form and try again' }
+  }
+
+  const { outlet, actor } = await currentOutlet()
+  // The category must belong to this outlet's menu; upsertItem derives menu_id from it.
+  const { getPublishedMenu } = await import('@/db/repos/index.ts')
+  const menu = await getPublishedMenu(outlet.id)
+  if (!menu || !menu.categories.some((c) => c.id === parsed.data.categoryId)) return { error: 'Unknown category' }
+  if (parsed.data.id && !menu.items.some((i) => i.id === parsed.data.id)) return { error: 'Unknown item' }
+
+  try {
+    await upsertItem({ ...parsed.data, description: parsed.data.description || null }, actor)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Could not save' }
+  }
+  revalidatePath('/app/menu')
+  revalidatePath('/app/orders/new')
+  redirect('/app/menu')
+}

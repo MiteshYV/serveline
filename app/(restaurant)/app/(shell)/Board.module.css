@@ -1,0 +1,97 @@
+.board {
+  display: grid;
+  gap: var(--space-12);
+}
+
+/* The alert band and the offline band sit above the board in normal flow — never over it. */
+.top {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.count {
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-tertiary);
+}
+
+/* Cards separate with an 8px gap on the app ground (design §5.4), not a hairline. */
+.list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Done is collapsed by default (design §7.1); the summary is a 56px counter target. */
+.done > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-counter);
+  padding: 0 var(--space-4);
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.done > summary::-webkit-details-marker {
+  display: none;
+}
+
+.done[open] > summary {
+  margin-bottom: var(--space-8);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- first run (design §7.9): "Preview my page" plus the QR to print ---- */
+.qr {
+  display: grid;
+  gap: var(--space-8);
+  justify-items: center;
+  padding: var(--space-16);
+  background: var(--bg-card);
+  border-radius: var(--radius-4);
+  box-shadow: var(--elev-1);
+}
+
+.qr img {
+  width: 160px;
+  height: 160px;
+}
+
+.qrLabel {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}

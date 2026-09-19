@@ -4,6 +4,8 @@ import type { NextConfig } from 'next'
 // 100 KB JS budget is defended by writing server components, not by build configuration.
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  // Stops `next dev` appending its agent-rules block to CLAUDE.md, which is a binding conventions file.
+  agentRules: false,
   serverExternalPackages: ['@electric-sql/pglite'],
 }
 

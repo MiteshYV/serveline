@@ -1,0 +1,31 @@
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-12);
+  align-items: center;
+  min-height: var(--row-counter);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--border-separator);
+}
+
+.meta {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+}
+
+.meta strong {
+  font-size: var(--text-body);
+}
+
+.muted {
+  color: var(--text-secondary);
+}
+
+.formRow {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  align-items: end;
+}

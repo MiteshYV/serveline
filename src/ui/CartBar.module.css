@@ -1,0 +1,38 @@
+.bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  min-height: calc(var(--space-64) + env(safe-area-inset-bottom));
+  padding: 0 var(--space-16) env(safe-area-inset-bottom);
+  background: var(--bg-inverse);
+  color: var(--text-inverse);
+  font-size: var(--text-body);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.dot {
+  padding: 0 var(--space-4);
+}
+
+.cta {
+  white-space: nowrap;
+}
+
+/* The menu list reserves room for the bar (design §7.4). */
+.reserve {
+  padding-bottom: calc(var(--space-64) + env(safe-area-inset-bottom) + var(--space-16));
+}

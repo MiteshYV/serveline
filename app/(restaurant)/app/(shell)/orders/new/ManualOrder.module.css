@@ -1,0 +1,166 @@
+.page {
+  display: grid;
+  gap: var(--space-24);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+.category {
+  margin: var(--space-8) 0 0;
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-tertiary);
+}
+
+.menu {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius-4);
+  overflow: hidden;
+  box-shadow: var(--elev-1);
+}
+
+/* The inline chooser for an item with variants or options, on the state-free sunken ground. */
+.chooser {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border-separator);
+}
+
+.groupName {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+}
+
+.groupHint {
+  font-weight: var(--fw-regular);
+  color: var(--text-secondary);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* A 56px labelled control (design §6.1); the native input keeps keyboard and screen-reader semantics. */
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--touch-counter);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  font-size: var(--text-label);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--action-fill);
+  box-shadow: inset 0 0 0 1px var(--action-fill);
+}
+
+.choice input {
+  width: var(--space-20);
+  height: var(--space-20);
+  margin: 0;
+  accent-color: var(--action-fill);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-12);
+  scroll-margin-top: var(--space-16);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--text-subtitle);
+  font-weight: var(--fw-bold);
+}
+
+.lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-8);
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--row-counter);
+  padding: var(--space-8) var(--space-12);
+  background: var(--bg-card);
+  border-radius: var(--radius-4);
+  box-shadow: var(--elev-1);
+}
+
+.lineName {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-body);
+}
+
+.linePrice {
+  white-space: nowrap;
+  font-weight: var(--fw-semi);
+}
+
+.totals {
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--text-body);
+}
+
+.totals > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.total {
+  font-weight: var(--fw-bold);
+  font-size: var(--text-subtitle);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+  line-height: var(--lh-ui);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--text-label);
+  color: var(--state-attention-ink);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-12);
+  align-items: flex-end;
+}
+
+.row > :first-child {
+  flex: 1;
+}
+
+.textarea {
+  min-height: calc(var(--touch-counter) * 1.5);
+  padding: var(--space-12);
+  resize: vertical;
+}

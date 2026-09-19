@@ -1,0 +1,189 @@
+/* Agent console — dense, desktop, mouse (design §4.4, §6.1). Real <table>s: the one surface
+   where a table is right. Hairline separators (§5.4), tabular numerals (§4.2), 32px targets.
+   Steel only: no state colour off an order state (§3.2), no brand colour but the swatch (§3.5). */
+
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  min-height: var(--space-48);
+  padding: 0 var(--space-20);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-separator);
+}
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  color: var(--text-primary);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.wordmark small { font-size: var(--text-caption); font-weight: var(--fw-regular); color: var(--text-tertiary); }
+.navLinks { display: flex; gap: var(--space-4); flex: 1; }
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-dense);
+  padding: 0 var(--space-8);
+  border-radius: var(--radius-3);
+  color: var(--text-secondary);
+  font-size: var(--text-body);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.navLink:hover { color: var(--text-primary); background: var(--bg-sunken); }
+.navLink[aria-current="page"] { color: var(--text-primary); font-weight: var(--fw-bold); }
+.navMeta { display: flex; align-items: center; gap: var(--space-12); color: var(--text-tertiary); font-size: var(--text-caption); }
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-24) var(--space-20) var(--space-64);
+  display: grid;
+  gap: var(--space-24);
+  align-content: start;
+}
+
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12) var(--space-24);
+}
+.title { margin: 0; font-size: var(--text-display); font-weight: var(--fw-bold); line-height: var(--lh-ui); }
+.meta { margin: var(--space-4) 0 0; color: var(--text-secondary); font-size: var(--text-label); }
+.crumbs { margin: 0 0 var(--space-4); font-size: var(--text-caption); color: var(--text-tertiary); }
+.crumbs a { color: inherit; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+
+.panel {
+  background: var(--bg-card);
+  border-radius: var(--radius-4);
+  box-shadow: var(--elev-1);
+  padding: var(--space-16) var(--space-20);
+  display: grid;
+  gap: var(--space-12);
+  align-content: start;
+}
+.panelHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); flex-wrap: wrap; }
+.panelTitle { margin: 0; font-size: var(--text-title); font-weight: var(--fw-bold); line-height: var(--lh-ui); }
+
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: var(--text-body); line-height: var(--lh-ui); }
+.table th {
+  text-align: left;
+  padding: var(--space-6) var(--space-8);
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-control);
+  white-space: nowrap;
+}
+.table td {
+  padding: var(--space-4) var(--space-8);
+  height: var(--touch-dense);
+  border-bottom: 1px solid var(--border-separator);
+  vertical-align: middle;
+}
+.table tbody tr:last-child td { border-bottom: 0; }
+.table a { color: var(--text-primary); }
+.right { text-align: right; }
+.muted { color: var(--text-tertiary); }
+.nowrap { white-space: nowrap; }
+.pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  line-height: var(--lh-ui);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 72ch;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-24);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-2);
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.tagStrong { color: var(--text-primary); border-color: var(--border-strong); }
+.tagQuiet { color: var(--text-disabled); border-style: dashed; }
+
+/* Dense controls: 32px, control border at the SC 1.4.11 floor (§5.4), 14px text. */
+.input, .select, .textarea {
+  width: 100%;
+  min-height: var(--touch-dense);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+}
+.textarea { padding: var(--space-6) var(--space-8); min-height: calc(var(--touch-dense) * 2); resize: vertical; }
+.input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--state-attention-ink); }
+.input:disabled { background: var(--bg-sunken); color: var(--text-disabled); }
+.check { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--touch-dense); font-size: var(--text-body); cursor: pointer; }
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--action-fill); }
+.fieldError { margin: var(--space-2) 0 0; font-size: var(--text-caption); line-height: var(--lh-ui); color: var(--state-attention-ink); }
+
+.inlineForm { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-8); }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-16); }
+.groupBox { margin: 0; padding: var(--space-12) var(--space-16); border: 1px solid var(--border-separator); border-radius: var(--radius-4); display: grid; gap: var(--space-12); }
+.groupBox legend { padding: 0 var(--space-4); font-size: var(--text-caption); font-weight: var(--fw-bold); color: var(--text-secondary); }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-4) var(--space-16); margin: 0; font-size: var(--text-body); }
+.kv dt { color: var(--text-secondary); }
+.kv dd { margin: 0; }
+
+/* Build Spec §11 checklist. Done and to-do are steel; no state colour (§11.3). */
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; }
+.step {
+  display: grid;
+  grid-template-columns: var(--space-24) 1fr max-content;
+  gap: var(--space-4) var(--space-12);
+  align-items: start;
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--border-separator);
+}
+.step:last-child { border-bottom: 0; }
+.step[data-state="deferred"] { color: var(--text-disabled); }
+.stepMark { display: inline-flex; width: var(--space-24); height: var(--space-24); align-items: center; justify-content: center; color: var(--text-primary); }
+.step[data-state="todo"] .stepMark { color: var(--border-control); }
+.stepNote { display: block; font-size: var(--text-caption); color: var(--text-tertiary); }
+.stepMeta { font-size: var(--text-caption); color: var(--text-secondary); text-align: right; white-space: nowrap; }
+.step[data-state="deferred"] .stepMeta { color: inherit; }
+
+/* Design §3.5: the one permitted brand-colour surface in the console. */
+.swatchRow { display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap; }
+.swatch { width: var(--space-32); height: var(--space-32); border-radius: var(--radius-1); border: 1px solid var(--border-control); flex: none; }
+
+.details summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-dense);
+  padding: 0 var(--space-8);
+  border-radius: var(--radius-3);
+  color: var(--action-ghost-ink);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+.details[open] summary { margin-bottom: var(--space-8); }
+
+.login { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-20); }
+.loginCard { width: 100%; max-width: 400px; display: grid; gap: var(--space-24); }

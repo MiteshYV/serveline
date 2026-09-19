@@ -1,0 +1,28 @@
+/* The +91 segment is 56px wide with a 1px right divider (design §7.5); no token names a
+   prefix width, so it is a literal here. The input keeps the border and the focus ring. */
+.wrap {
+  --prefix-w: 56px;
+  position: relative;
+}
+
+.prefix {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--prefix-w);
+  border-right: 1px solid var(--border-control);
+  border-radius: var(--radius-3) 0 0 var(--radius-3);
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  font-family: var(--font-numeric);
+  font-size: var(--fs-base-l);
+  font-weight: var(--fw-semi);
+  pointer-events: none;
+}
+
+.input {
+  padding-left: calc(var(--prefix-w) + var(--space-12));
+  letter-spacing: 0.02em; /* Latin digits only, so tracking is legal (design §4.2) */
+}

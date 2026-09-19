@@ -51,3 +51,17 @@ export const applyPercentDiscount = (subtotal: Paise, percent: number): Paise =>
   // `subtotal * percent` is exact: both are integers and a restaurant bill is nowhere near 2^53.
   return paise(subtotal - Math.ceil((subtotal * percent) / 100))
 }
+
+/**
+ * The one place rupees come IN: a price typed into a menu editor. "240", "240.5", "₹1,200.00"
+ * and "-90" (a half-plate delta) become paise without a float ever being involved. Anything
+ * else throws; forms validate before calling, so a throw here is a programmer error.
+ */
+export const parseINR = (text: string): Paise => {
+  const m = /^(-?)(\d{1,7})(?:\.(\d{1,2}))?$/.exec(text.trim().replace(/^₹/, '').replace(/,/g, ''))
+  if (!m) throw new TypeError('Price must be rupees with at most two decimals')
+  const sign = m[1] === '-' ? -1 : 1
+  const whole = Number(m[2] ?? '0')
+  const frac = Number((m[3] ?? '').padEnd(2, '0'))
+  return paise(sign * (whole * 100 + frac))
+}

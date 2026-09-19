@@ -1,0 +1,52 @@
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--space-40);
+  padding: var(--space-8) var(--space-16);
+  font-size: var(--text-body);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.action {
+  flex: none;
+}
+
+/* Offline / failed request (design §7.10.1). Red at band scale is wash, never plate (§3.4). */
+.attention {
+  background: var(--state-attention-wash);
+  color: var(--state-attention-ink);
+}
+
+/* New-order alert (design §8): static, high contrast, stays until acknowledged. */
+.received {
+  background: var(--state-received-plate);
+  color: var(--state-received-on);
+}
+
+/* Not an order state, so no state colour (palette law, §3.2). Sunken ground, steel-400 edge. */
+.neutral {
+  background: var(--bg-sunken);
+  color: var(--text-primary);
+  border-left: 4px solid var(--border-control);
+}
+
+/* Exactly three cycles of transform/opacity, 600ms each, then still (design §8). Under
+   prefers-reduced-motion tokens.css collapses this to one near-zero cycle. */
+.pulse {
+  animation: band-pulse 600ms var(--ease-inout) 3;
+  transform-origin: center;
+}
+
+@keyframes band-pulse {
+  50% {
+    transform: scale(1.015);
+    opacity: 0.92;
+  }
+}

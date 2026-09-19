@@ -1,0 +1,515 @@
+/* The customer ordering surface: comfort density, brand in the header and the CTA only
+   (design §3.5), elevation 0/1 only (§5.3), 16px gutters (§5.1). */
+
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- header band: the one place the brand is a field ---- */
+.band {
+  background: var(--brand-fill);
+  color: var(--brand-on);
+  padding: var(--space-12) var(--space-16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.bandTitle {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.lang {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex: none;
+  font-size: var(--text-label);
+  color: inherit;
+}
+
+.langSelect {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-8);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-3);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-body);
+}
+
+.langSelect option {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.footer {
+  padding: var(--space-24) var(--space-16) calc(var(--space-24) + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: var(--text-caption);
+  line-height: var(--lh-ui);
+  color: var(--text-tertiary);
+}
+
+/* ---- menu page ---- */
+.context {
+  padding: var(--space-12) var(--space-16) 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+}
+
+.codeForm {
+  display: flex;
+  gap: var(--space-8);
+  align-items: flex-end;
+}
+
+.codeForm > :first-child {
+  flex: 1;
+}
+
+/* Category jump links: a horizontal strip, the active one underlined in brand ink (design §3.5). */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding: 0 var(--space-12);
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border-separator);
+  scrollbar-width: none;
+}
+
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-12);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tabActive {
+  color: var(--brand-ink);
+  border-bottom-color: var(--brand-ink);
+}
+
+.section {
+  scroll-margin-top: calc(var(--touch-min) + var(--space-8));
+}
+
+.sectionTitle {
+  margin: 0;
+  padding: var(--space-20) var(--space-16) var(--space-8);
+  font-size: var(--text-subtitle);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  color: var(--text-primary);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--bg-card);
+  box-shadow: var(--elev-1);
+}
+
+/* The option chooser: an inline panel under the row on the brand wash — never a modal (§11.20). */
+.chooser {
+  list-style: none;
+  padding: var(--space-16);
+  background: var(--brand-wash);
+  border-bottom: 1px solid var(--border-separator);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.chooserTitle {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.groupLegend {
+  padding: 0;
+  margin-bottom: var(--space-4);
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.groupHint {
+  font-weight: var(--fw-regular);
+  color: var(--text-secondary);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+  cursor: pointer;
+}
+
+.choice input {
+  width: var(--space-20);
+  height: var(--space-20);
+  margin: 0;
+  accent-color: var(--brand-ink);
+}
+
+.choiceName {
+  flex: 1;
+}
+
+.chooserActions {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.chooserActions > * {
+  flex: 1;
+}
+
+.empty {
+  padding: var(--space-24) var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+}
+
+.note {
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+/* ---- checkout steps: each a full screen with a visible step indicator (design §7.4) ---- */
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  padding: var(--space-16) var(--space-16) var(--space-32);
+}
+
+.stepIndicator {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  color: var(--text-tertiary);
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-4);
+  box-shadow: var(--elev-1);
+  padding: var(--space-16);
+}
+
+/* The consent notice, rendered from contracts/notices (design §4.2: body line-height 1.6). */
+.notice {
+  font-size: var(--text-label);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  max-height: 40dvh;
+  overflow-y: auto;
+  padding-right: var(--space-8);
+}
+
+.notice h2 { font-size: var(--text-subtitle); font-weight: var(--fw-bold); line-height: var(--lh-ui); margin: 0 0 var(--space-12); }
+.notice h3 { font-size: var(--text-body); font-weight: var(--fw-bold); line-height: var(--lh-ui); margin: var(--space-16) 0 var(--space-8); }
+.notice p { margin: 0 0 var(--space-12); }
+.notice ul { margin: 0 0 var(--space-12); padding-left: var(--space-20); }
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  min-height: var(--touch-min);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+  cursor: pointer;
+}
+
+.check input {
+  flex: none;
+  width: var(--space-24);
+  height: var(--space-24);
+  margin: var(--space-2) 0 0;
+  accent-color: var(--brand-ink);
+}
+
+/* A saved address or a payment method: one tap target, a plate not a pill. */
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  min-height: var(--touch-counter);
+  padding: var(--space-12) var(--space-16);
+  background: var(--bg-card);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-3);
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.option input {
+  flex: none;
+  width: var(--space-20);
+  height: var(--space-20);
+  margin: var(--space-2) 0 0;
+  accent-color: var(--brand-ink);
+}
+
+.optionBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.optionMeta {
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.optionSelected {
+  border-color: var(--brand-ink);
+  background: var(--brand-wash);
+}
+
+.hr {
+  border: 0;
+  border-top: 1px solid var(--border-separator);
+  margin: 0;
+}
+
+.subhead {
+  margin: 0;
+  font-size: var(--text-subtitle);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.demo {
+  font-size: var(--text-label);
+}
+
+/* ---- order summary and totals ---- */
+.lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12) 0;
+  border-bottom: 1px solid var(--border-separator);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+}
+
+.lineName {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineSub {
+  display: block;
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.lineAmount {
+  flex: none;
+  font-weight: var(--fw-semi);
+  white-space: nowrap;
+}
+
+.totals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.totalRow strong {
+  font-size: var(--text-subtitle);
+}
+
+.inlineLink {
+  color: var(--brand-ink);
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.textBtn {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-8);
+  border: 0;
+  background: transparent;
+  color: var(--action-ghost-ink);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+  border-radius: var(--radius-3);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--state-attention-ink);
+}
+
+/* ---- the status page: the UPI confirmation vocabulary (design §2) — big amount, one mark ---- */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  padding: var(--space-24) var(--space-16) var(--space-32);
+}
+
+.statusHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  text-align: center;
+}
+
+.amount {
+  font-size: var(--fs-display-l);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  color: var(--text-primary);
+}
+
+.statusMsg {
+  margin: 0;
+  font-size: var(--text-subtitle);
+  line-height: var(--lh-ui);
+}
+
+.locator {
+  font-family: var(--font-numeric);
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.02em; /* Latin-only system label (design §7.1) */
+  color: var(--text-secondary);
+}
+
+.kv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+}
+
+.kvLabel {
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.withdraw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--border-separator);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}

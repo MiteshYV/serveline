@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/ui/Band.module.css"
+        ],
+        "createdAt": "2026-09-18T18:33:20.524Z",
+        "reason": "Design language decision, not a default: docs/design/steel-and-enamel.md §5.4 makes a 4px left edge the system's signature and the SC 1.4.1 shape-not-colour encoding; §7.8 specifies exactly this steel-400 edge for the Monday nag. Produced by the impeccable direction pass the user requested."
+      }
+    ]
+  }
+}

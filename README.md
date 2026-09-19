@@ -47,6 +47,7 @@ src/
   core/       domain logic with no framework imports — cart, order state, codes, consent
   db/         Drizzle schema, migrations, seed
   adapters/   payments, sms, storage, llm — one interface and one mock each
+  auth/       phone OTP and session cookies
   ui/         design tokens and shared components
 contracts/    language-neutral files the Python voice service will also read at M2
 docs/         ADRs, runbooks, design specs
