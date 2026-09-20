@@ -5,17 +5,24 @@ import { Band } from '@/ui/Band.tsx'
 import { Button } from '@/ui/Button.tsx'
 import { Field } from '@/ui/Field.tsx'
 import fieldStyles from '@/ui/Field.module.css'
+import { td } from '@/ui/i18n-dashboard.ts'
 import { t, type Lang } from '@/ui/i18n.ts'
 import { saveExternalCount, skipNag, type NagState } from './nag-actions.ts'
 import styles from './MondayNag.module.css'
 
-/** Design §7.8's ranges. The midpoint is what gets stored: "the range is enough for the metric". */
+/**
+ * Design §7.8's ranges: an easier question than an exact count. A chip only fills the exact
+ * field with the range's floor — the one number the range actually vouches for — so the operator
+ * sees it and can correct it before Save. Only the field's value is ever stored: an invented
+ * midpoint would sit in external_order_count as if exact and overstate the North Star's
+ * denominator (Ideation, "North Star: Direct Order Share").
+ */
 const PICKS: { label: string; value: number }[] = [
   { label: '0', value: 0 },
-  { label: '1–10', value: 5 },
-  { label: '11–25', value: 18 },
-  { label: '26–50', value: 38 },
-  { label: '50+', value: 75 },
+  { label: '1–10', value: 1 },
+  { label: '11–25', value: 11 },
+  { label: '26–50', value: 26 },
+  { label: '50+', value: 50 },
 ]
 
 const IDLE_MS = 20_000
@@ -51,7 +58,7 @@ export function MondayNag({ lang, weekStart }: Props) {
 
   if (collapsed) {
     return (
-      <Band tone="neutral" action={<Button size="dense" variant="ghost" onClick={() => setCollapsed(false)}>{t('nag.collapsed', lang)} →</Button>}>
+      <Band tone="neutral" action={<Button size="counter" variant="ghost" onClick={() => setCollapsed(false)}>{t('nag.collapsed', lang)} →</Button>}>
         {t('nag.collapsed', lang)}
       </Band>
     )
@@ -90,7 +97,7 @@ export function MondayNag({ lang, weekStart }: Props) {
         <div className={styles.aggregator}>
           <span className={styles.aggName}>{t('nag.swiggy', lang)}</span>
           {picks(swiggy, setSwiggy)}
-          <Field id={ids.swiggy} label={t('nag.exact', lang)}>
+          <Field id={ids.swiggy} label={t('nag.exact', lang)} hint={td('nag.editHint', lang)}>
             {(p) => (
               <input {...p} name="swiggy" className={`${fieldStyles.control} num`} type="text" inputMode="numeric" pattern="[0-9]*" value={swiggy} onChange={(e) => setSwiggy(e.target.value.replace(/\D/g, ''))} required />
             )}
@@ -99,7 +106,7 @@ export function MondayNag({ lang, weekStart }: Props) {
         <div className={styles.aggregator}>
           <span className={styles.aggName}>{t('nag.zomato', lang)}</span>
           {picks(zomato, setZomato)}
-          <Field id={ids.zomato} label={t('nag.exact', lang)}>
+          <Field id={ids.zomato} label={t('nag.exact', lang)} hint={td('nag.editHint', lang)}>
             {(p) => (
               <input {...p} name="zomato" className={`${fieldStyles.control} num`} type="text" inputMode="numeric" pattern="[0-9]*" value={zomato} onChange={(e) => setZomato(e.target.value.replace(/\D/g, ''))} required />
             )}

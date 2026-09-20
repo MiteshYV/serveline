@@ -318,7 +318,12 @@ export async function seed(db: Db): Promise<'seeded' | 'already_seeded'> {
         landmark: p.address.landmark, area: 'Koramangala', pincode: p.address.pincode, source: 'page', isConfirmed: true,
         lastUsedAt: grantedAt, createdAt: grantedAt,
       }).returning())[0], 'address row')
-      await audit(customer.id, 'customer_address', address.id, address)
+      // The projection saveAddress audits, not the row: the door (line1, landmark) never enters
+      // audit_log (CLAUDE.md), and the admin audit page renders `after` as it is.
+      await audit(customer.id, 'customer_address', address.id, {
+        id: address.id, customerId: address.customerId, restaurantId: address.restaurantId, label: address.label,
+        area: address.area, pincode: address.pincode, source: address.source, isConfirmed: address.isConfirmed,
+      })
 
       return { customer, consent, address }
     }

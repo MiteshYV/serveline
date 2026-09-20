@@ -18,6 +18,7 @@ import { hashPhone } from '../core/phone.ts'
 
 process.env.DATABASE_URL = `file://${mkdtempSync(join(tmpdir(), 'serveline-checkout-'))}`
 process.env.VENDOR_MODE = 'mock'
+process.env.PHONE_HASH_PEPPER ??= 'test-pepper' // secrets.ts derives one only under `next dev`
 
 const { db, schema } = await import('../db/client.ts')
 const { seed } = await import('../db/seed.ts')

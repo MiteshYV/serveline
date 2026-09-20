@@ -213,7 +213,7 @@ export function Board({ outletId, lang, initial, since, ordersToday }: Props) {
     <section className={styles.board} aria-label={td('nav.board', lang)}>
       <div className={styles.top}>
         {offline && (
-          <Band tone="attention" action={<Button size="dense" variant="ghost" onClick={() => router.refresh()}>{t('net.retry', lang)}</Button>}>
+          <Band tone="attention" action={<Button size="counter" variant="ghost" onClick={() => router.refresh()}>{t('net.retry', lang)}</Button>}>
             {t('net.offline', lang)}
           </Band>
         )}
@@ -222,17 +222,18 @@ export function Board({ outletId, lang, initial, since, ordersToday }: Props) {
             key={pulseKey}
             tone="received"
             pulse
-            action={<Button size="dense" variant="ghost" onClick={() => setNewCount(0)}>{td('board.seen', lang)}</Button>}
+            action={<Button size="counter" variant="ghost" onClick={() => setNewCount(0)}>{td('board.seen', lang)}</Button>}
           >
             {newCount === 1 ? t('board.newOrderOne', lang) : t('board.newOrders', lang, { n: newCount })}
           </Band>
         )}
         <div className={styles.toolbar}>
-          <span className={styles.count}>{t('empty.allDone', lang, { n: todayCount }).split('.').slice(1).join('.').trim() || `${todayCount}`}</span>
+          <span className={styles.count}>{td('board.ordersToday', lang, { n: todayCount })}</span>
+          {/* Design §6.1–6.2: a 56px target like everything on the counter, and a ghost — the plate belongs to the card primaries. */}
           {sound.enabled ? (
-            <Button size="dense" variant="ghost" onClick={sound.disable}>{td('board.soundOff', lang)}</Button>
+            <Button size="counter" variant="ghost" onClick={sound.disable}>{td('board.soundOff', lang)}</Button>
           ) : (
-            <Button size="dense" variant="primary" onClick={sound.enable}>{t('board.enableSound', lang)}</Button>
+            <Button size="counter" variant="ghost" onClick={sound.enable}>{t('board.enableSound', lang)}</Button>
           )}
         </div>
       </div>

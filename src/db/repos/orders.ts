@@ -304,7 +304,8 @@ export async function markCorrected(orderId: string, actor: Actor): Promise<Orde
  * A payment link now exists for this order. Records the `payment`, flags the order as
  * awaiting, and — if the order is still `received` — moves it to `awaiting_payment`, the
  * UPI-link branch of Build Spec §4. An order already past `received` (a resent link, Build
- * Spec §7) keeps its status and simply gains another payment row.
+ * Spec §7) keeps its status and gains another payment row — and the link it replaces is
+ * closed, so a customer holding both SMSes has one live link, not two.
  */
 export async function attachPayment(
   input: { orderId: string; gateway: string; linkId: string; amountPaise: number },
@@ -313,6 +314,14 @@ export async function attachPayment(
   return db.transaction(async (tx) => {
     const current = await tx.query.order.findFirst({ where: eq(order.id, input.orderId) })
     if (!current) throw new Error(`No order ${input.orderId}`)
+
+    // The enum has no `expired`; `unpaid` is the nearest — no money moved on this link and none
+    // is expected. If the customer pays the old link anyway, `markPaid` still honours it once.
+    const superseded = await tx
+      .update(payment)
+      .set({ status: 'unpaid' })
+      .where(and(eq(payment.orderId, input.orderId), eq(payment.status, 'awaiting')))
+      .returning({ id: payment.id })
 
     const row = firstRow(
       await tx
@@ -340,6 +349,17 @@ export async function attachPayment(
       before: null,
       after: row,
     }, tx)
+    for (const old of superseded) {
+      await writeAudit({
+        actorType: actor.type,
+        actorId: actor.id,
+        action: 'payment.supersede',
+        entity: 'payment',
+        entityId: old.id,
+        before: { status: 'awaiting' },
+        after: { status: 'unpaid', supersededBy: row.id },
+      }, tx)
+    }
     return row
   })
 }
@@ -352,7 +372,8 @@ export type MarkPaidResult =
  * The gateway webhook. Build Spec §9: "verified and idempotent" — verification is the
  * adapter's, idempotency is here. A second identical webhook finds the payment already paid
  * and returns without touching anything; it is not an error, because the gateway retries on
- * anything but a 2xx and would otherwise retry forever.
+ * anything but a 2xx and would otherwise retry forever. A webhook for another link on an
+ * order that is already paid gets the same answer.
  *
  * Refusals come back as values for the same reason: a link this database has never seen, or
  * an amount that is not the amount the link was made for, are logged by the route and
@@ -370,6 +391,13 @@ export async function markPaid(
     const [pay] = await tx.select().from(payment).where(eq(payment.linkId, linkId)).for('update')
     if (!pay) return { ok: false, reason: 'unknown_link' }
     if (pay.status === 'paid') return { ok: true, orderId: pay.orderId, alreadyPaid: true }
+
+    const current = await tx.query.order.findFirst({ where: eq(order.id, pay.orderId) })
+    if (!current) throw new Error(`Payment ${pay.id} references missing order ${pay.orderId}`)
+    // The order was paid through another link (a resent one, Build Spec §7 — both SMSes reach
+    // the phone). The same no-op as a repeated webhook: nothing is written, the order stays paid
+    // once. Whatever the gateway captured on the surplus link is a refund, and a human decision.
+    if (current.paymentStatus === 'paid') return { ok: true, orderId: current.id, alreadyPaid: true }
     if (pay.amountPaise !== amountPaise) return { ok: false, reason: 'amount_mismatch' }
 
     const now = new Date()
@@ -377,9 +405,6 @@ export async function markPaid(
       .update(payment)
       .set({ status: 'paid', paymentId, paidAt: now, webhookPayload })
       .where(eq(payment.id, pay.id))
-
-    const current = await tx.query.order.findFirst({ where: eq(order.id, pay.orderId) })
-    if (!current) throw new Error(`Payment ${pay.id} references missing order ${pay.orderId}`)
 
     // `awaiting_payment -> confirmed` is the UPI branch; `received -> confirmed` covers a
     // webhook that outran the link being attached. Anything else (already confirmed, or

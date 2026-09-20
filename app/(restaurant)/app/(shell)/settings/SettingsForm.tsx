@@ -66,7 +66,7 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
         <legend className={styles.legend}>Languages</legend>
         {err('languages') && <p className={styles.error}>{err('languages')}</p>}
         {(['hi', 'en', 'kn'] as const).map((l) => (
-          <label key={l} className={styles.check}>
+          <label key={l} lang={l} className={styles.check}>
             <input type="checkbox" name="languages" value={l} defaultChecked={values.languages.includes(l)} />
             {l === 'hi' ? 'हिन्दी' : l === 'en' ? 'English' : 'ಕನ್ನಡ'}
           </label>

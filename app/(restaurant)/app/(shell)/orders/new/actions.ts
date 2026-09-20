@@ -11,8 +11,8 @@ import { formatINR, paise } from '@/core/money.ts'
 import { hashPhone, normalisePhone } from '@/core/phone.ts'
 import { checkServiceability } from '@/core/serviceability.ts'
 import {
-  attachPayment, createOrder, findCustomerByPhoneHash, getConsent, getPublishedMenu, listAddresses, logSms,
-  saveAddress, toPricedMenu, transitionOrder, upsertCustomer, upsertCustomerRestaurant,
+  attachPayment, createOrder, findCustomerByPhoneHash, getConsent, getCustomerRestaurant, getPublishedMenu, listAddresses,
+  logSms, saveAddress, toPricedMenu, transitionOrder, upsertCustomer, upsertCustomerRestaurant,
 } from '@/db/repos/index.ts'
 import { appOrigin } from '../../../_lib/origin.ts'
 import { currentOutlet } from '../../../_lib/session.ts'
@@ -26,6 +26,7 @@ export type Lookup =
   | { ok: false }
   | {
       ok: true
+      /** Known at *this* restaurant (a customer_restaurant row), never merely known to the platform. */
       found: boolean
       /** A live `order_fulfilment` consent at this restaurant (Build Spec §10). */
       consented: boolean
@@ -42,7 +43,11 @@ export async function lookupCustomer(phoneRaw: string): Promise<Lookup> {
     return { ok: false }
   }
   const customer = await findCustomerByPhoneHash(hashPhone(phone, phonePepper()))
-  if (!customer) return { ok: true, found: false, consented: false, name: null, addresses: [] }
+  // `customer` is platform-wide. Nothing crosses restaurants (Build Spec §4), so a number with no
+  // profile here answers exactly as a number nobody has seen — or staff could probe which phones
+  // have ordered from some other ServeLine restaurant.
+  const profile = customer ? await getCustomerRestaurant(customer.id, restaurant.id) : null
+  if (!customer || !profile) return { ok: true, found: false, consented: false, name: null, addresses: [] }
   const consent = await getConsent(customer.id, restaurant.id)
   const consented = hasValidConsent(consent ?? undefined, 'order_fulfilment')
   // Nothing beyond the phone is shown without consent: the name and the addresses are profile fields.
@@ -161,7 +166,9 @@ export async function placeManualOrder(raw: unknown): Promise<PlaceResult> {
     channel: 'staff_manual',
     fulfilment: input.fulfilment,
     ...(input.tableNo ? { tableNo: input.tableNo } : {}),
-    ...(customerId ? { customerId } : {}),
+    // Build Spec §7: the phone field "links the order to a profile if consent exists". Without
+    // one the phone-only row still exists for the UPI link SMS, but the order is not linked to it.
+    ...(customerId && mayStoreProfile ? { customerId } : {}),
     ...(addressId ? { addressId } : {}),
     paymentMethod,
     ...(input.notes ? { notes: input.notes } : {}),

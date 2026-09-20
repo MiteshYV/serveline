@@ -4,6 +4,10 @@ import { hashPhone } from '../core/phone.ts'
 import { RateLimitedError, issueOtp, mintChallenge, verifyOtp } from './otp.ts'
 import { phonePepper } from './secrets.ts'
 
+// node --test sets no NODE_ENV, and secrets.ts derives dev values only under `next dev`.
+process.env.SESSION_SECRET ??= 'test-session-secret'
+process.env.PHONE_HASH_PEPPER ??= 'test-pepper'
+
 // Each test uses its own number so the per-phone limiter never bleeds between tests.
 const phone = (n: number) => `+9198765${String(n).padStart(5, '0')}`
 const ctx = { origin: 'localhost:3000' }
@@ -56,9 +60,10 @@ test('the sixth issue for a phone in ten minutes is refused', async () => {
   await assert.rejects(issueOtp(phone(7), ctx), RateLimitedError)
 })
 
-test('the sixth issue from an IP in ten minutes is refused across phones', async () => {
-  for (let i = 0; i < 5; i++) await issueOtp(phone(10 + i), { ...ctx, ip: '203.0.113.9' })
-  await assert.rejects(issueOtp(phone(15), { ...ctx, ip: '203.0.113.9' }), RateLimitedError)
+test('the sixty-first issue from an IP in ten minutes is refused across phones', async () => {
+  // Sixty, not five: one address is a whole restaurant's Wi-Fi or a CGNAT neighbourhood (otp.ts).
+  for (let i = 0; i < 60; i++) await issueOtp(phone(100 + i), { ...ctx, ip: '203.0.113.9' })
+  await assert.rejects(issueOtp(phone(160), { ...ctx, ip: '203.0.113.9' }), RateLimitedError)
 })
 
 test('the sixth verify attempt for a phone in ten minutes is refused', async () => {

@@ -5,6 +5,7 @@
  */
 
 import { and, eq } from 'drizzle-orm'
+import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { paise } from '../../core/money.ts'
 import { db, type Db } from '../client.ts'
 import { auditLog, externalOrderCount, smsKind, smsMessage, smsStatus } from '../schema/index.ts'
@@ -58,6 +59,25 @@ export function firstRow<T>(rows: T[], what = 'the statement'): T {
   const row = rows[0]
   if (row === undefined) throw new Error(`No row returned for ${what}`)
   return row
+}
+
+/**
+ * Runs a write whose parameters are customer data. drizzle-orm's DrizzleQueryError reads
+ * "Failed query: <sql>\nparams: <values>", so a driver failure — a lock, a constraint race —
+ * would carry the phone number or the address line into Next's server error log (CLAUDE.md:
+ * no PII in logs, ever). Only the SQLSTATE survives. The cause is dropped on purpose: Node's
+ * inspect prints the cause chain, params and all. Every other error passes through untouched.
+ *
+ * codes.ts is deliberately not wrapped: `recordRedemption` reads the cause's 23505 itself.
+ */
+export async function guarded<T>(what: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (error) {
+    if (!(error instanceof DrizzleQueryError)) throw error
+    const code = (error.cause as { code?: unknown } | undefined)?.code
+    throw new Error(`${what} failed${typeof code === 'string' ? ` (${code})` : ''}`)
+  }
 }
 
 // --- sms_message ---------------------------------------------------------------------------

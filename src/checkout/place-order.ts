@@ -55,7 +55,7 @@ export async function resolveCode(
 }
 
 export type PlaceOrderInput = {
-  restaurant: Pick<typeof restaurant.$inferSelect, 'id' | 'name' | 'slug'>
+  restaurant: Pick<typeof restaurant.$inferSelect, 'id' | 'name' | 'slug' | 'status'>
   outlet: Pick<typeof outlet.$inferSelect, 'id' | 'codEnabled'>
   customer: Pick<typeof customer.$inferSelect, 'id' | 'phone' | 'phoneHash'>
   lang: Lang
@@ -69,6 +69,7 @@ export type PlaceOrderInput = {
 }
 
 export type PlaceOrderFailure =
+  | 'restaurant_closed'
   | 'empty_cart'
   | 'menu_unavailable'
   | 'bad_payment_method'
@@ -84,6 +85,11 @@ export type PlaceOrderResult =
 export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
   const { restaurant, outlet, customer, context } = input
   const actor: Actor = { type: 'customer', id: customer.id }
+
+  // Build Spec §8: a suspended (or churned) restaurant takes no orders on any channel. The page
+  // 404s it first (app/(customer)/r/[slug]/lib.ts); this is for a tab opened before the
+  // suspension, and for every caller that is not the page.
+  if (restaurant.status !== 'trialing' && restaurant.status !== 'active') return { ok: false, reason: 'restaurant_closed' }
 
   if (input.items.length === 0) return { ok: false, reason: 'empty_cart' }
 

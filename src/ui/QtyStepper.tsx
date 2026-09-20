@@ -68,7 +68,8 @@ export function QtyStepper({ qty, onChange, itemName, lang, size = 'customer', m
             type="button"
             className={`${styles.number} num`}
             onClick={() => setDraft(String(qty))}
-            aria-label={t('qty.label', lang)}
+            // The name carries the value too (design §9): "Quantity: 4", not a bare "Quantity".
+            aria-label={`${t('qty.label', lang)}: ${qty}`}
           >
             <span aria-live="polite" aria-atomic="true">
               {qty}

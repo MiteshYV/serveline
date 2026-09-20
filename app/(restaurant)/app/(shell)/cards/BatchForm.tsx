@@ -23,7 +23,7 @@ export function BatchForm() {
           {(p) => <input {...p} name="validTo" type="date" className={fieldStyles.control} />}
         </Field>
       </div>
-      {state.error && <p className={settings.error} role="alert">{state.error}</p>}
+      {state.error && <p className={settings.error} role="status">{state.error}</p>}
       {state.created && <p className={settings.hint} role="status">{state.created} cards generated. Print them from the list below.</p>}
       <Button size="counter" type="submit" disabled={pending}>{pending ? 'Generating…' : 'Generate cards'}</Button>
     </form>

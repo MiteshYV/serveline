@@ -96,10 +96,11 @@ export async function createRestaurantAction(_prev: NewRestaurantState, fd: Form
       owner: { name: d.ownerName, phone: d.ownerPhone, phoneHash: hashPhone(d.ownerPhone, phonePepper()) },
     }, { type: 'platform', id: session.subjectId })
     id = created.restaurant.id
-  } catch (e) {
-    // The unique index has the last word on the slug (a race with the check above), and anything
-    // else is shown as text: the agent console is the one surface allowed an error message (design §7.10).
-    return { error: e instanceof Error ? e.message : 'Could not create the restaurant' }
+  } catch {
+    // The unique index has the last word on the slug (a race with the check above). The agent
+    // console may show an error (design §7.10), but a fixed one, never the error's own text: a
+    // failed insert's message can carry its parameters, and two of them are the owner's mobile.
+    return { error: 'Could not create the restaurant' }
   }
   revalidatePath('/agent')
   redirect(`/agent/restaurants/${id}`)

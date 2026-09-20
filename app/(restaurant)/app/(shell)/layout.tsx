@@ -36,7 +36,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
             {restaurant.name} · {outlet.name}
           </span>
           <form action={signOut}>
-            <Button variant="ghost" size="dense" type="submit">{td('login.signOut', lang)}</Button>
+            <Button variant="ghost" size="counter" type="submit">{td('login.signOut', lang)}</Button>
           </form>
         </div>
         <Nav items={items} label={td('nav.board', lang)} />

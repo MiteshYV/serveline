@@ -3,6 +3,9 @@ import { test } from 'node:test'
 import { decodeJwt } from 'jose'
 import { signSession, verifySession } from './jwt.ts'
 
+// node --test sets no NODE_ENV, and secrets.ts derives a dev key only under `next dev`.
+process.env.SESSION_SECRET ??= 'test-session-secret'
+
 test('a signed session verifies back to the same claims', async () => {
   const token = await signSession({ audience: 'staff', subjectId: 'u1', restaurantId: 'r1', role: 'owner' })
   assert.deepEqual(await verifySession(token, 'staff'), {
@@ -39,13 +42,18 @@ test('Build Spec §3: customer sessions last 30 days, staff and platform 7', asy
   assert.equal(await ttl('platform'), 7 * 86_400)
 })
 
-test('production with no SESSION_SECRET refuses to sign rather than using the dev secret', async () => {
+test('with no SESSION_SECRET only `next dev` gets a derived key; every other NODE_ENV refuses to sign', async () => {
   const env = process.env as Record<string, string | undefined> // Next types NODE_ENV read-only
   const saved = { NODE_ENV: env.NODE_ENV, SESSION_SECRET: env.SESSION_SECRET }
-  env.NODE_ENV = 'production'
   delete env.SESSION_SECRET
   try {
-    await assert.rejects(signSession({ audience: 'customer', subjectId: 'c1' }), /SESSION_SECRET/)
+    for (const mode of ['production', 'staging', 'test', undefined]) {
+      if (mode === undefined) delete env.NODE_ENV
+      else env.NODE_ENV = mode
+      await assert.rejects(signSession({ audience: 'customer', subjectId: 'c1' }), /SESSION_SECRET/, `NODE_ENV=${mode}`)
+    }
+    env.NODE_ENV = 'development'
+    assert.match(await signSession({ audience: 'customer', subjectId: 'c1' }), /^eyJ/)
   } finally {
     if (saved.NODE_ENV === undefined) delete env.NODE_ENV
     else env.NODE_ENV = saved.NODE_ENV

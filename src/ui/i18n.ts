@@ -85,11 +85,17 @@ const DICT = {
   'checkout.phone': { en: 'Phone', hi: 'फ़ोन', kn: 'ಫೋನ್' },
   'checkout.confirm': { en: 'Confirm', hi: 'पुष्टि', kn: 'ದೃಢೀಕರಣ' },
   'checkout.table': { en: 'Table {n}', hi: 'टेबल {n}', kn: 'ಟೇಬಲ್ {n}' },
+  'checkout.delivery': { en: 'Delivery', hi: 'डिलीवरी', kn: 'ಡೆಲಿವರಿ' },
   'checkout.address': { en: 'Delivery address', hi: 'डिलीवरी का पता', kn: 'ವಿತರಣಾ ವಿಳಾಸ' },
   'checkout.payUpi': { en: 'Pay by UPI', hi: 'UPI से भुगतान करें', kn: 'UPI ಮೂಲಕ ಪಾವತಿಸಿ' },
   'checkout.payCod': { en: 'Cash on delivery', hi: 'डिलीवरी पर नकद', kn: 'ಡೆಲಿವರಿ ವೇಳೆ ನಗದು' },
   'checkout.placeOrder': { en: 'Place order', hi: 'ऑर्डर करें', kn: 'ಆರ್ಡರ್ ಮಾಡಿ' },
   'checkout.codeApplied': { en: '{percent}% off applied', hi: '{percent}% छूट लागू', kn: '{percent}% ರಿಯಾಯಿತಿ ಅನ್ವಯಿಸಲಾಗಿದೆ' },
+  'checkout.consentRequired': {
+    en: 'Please agree to how your details are used before ordering',
+    hi: 'ऑर्डर करने से पहले कृपया अपनी जानकारी के उपयोग पर सहमति दें',
+    kn: 'ಆರ್ಡರ್ ಮಾಡುವ ಮೊದಲು ನಿಮ್ಮ ವಿವರಗಳ ಬಳಕೆಗೆ ಒಪ್ಪಿಗೆ ನೀಡಿ',
+  },
   'checkout.codeUsed': {
     // One card per phone per restaurant (Ideation §8): a second card from the same restaurant is
     // refused too, so the message names the restaurant, not the code.
@@ -275,6 +281,7 @@ const DICT = {
   },
   'status.payNow': { en: 'Pay {amount} by UPI', hi: 'UPI से {amount} चुकाएँ', kn: 'UPI ಮೂಲಕ {amount} ಪಾವತಿಸಿ' },
   'status.paySms': { en: 'Use the payment link sent to you by SMS.', hi: 'SMS से भेजा गया भुगतान लिंक इस्तेमाल करें।', kn: 'SMS ಮೂಲಕ ಕಳುಹಿಸಿದ ಪಾವತಿ ಲಿಂಕ್ ಬಳಸಿ.' },
+  'status.linkExpired': { en: 'This payment link has expired.', hi: 'इस भुगतान लिंक की अवधि खत्म हो गई।', kn: 'ಈ ಪಾವತಿ ಲಿಂಕ್ ಅವಧಿ ಮುಗಿದಿದೆ.' },
   'status.updates': { en: 'This page updates on its own.', hi: 'यह पेज अपने आप अपडेट होता है।', kn: 'ಈ ಪುಟ ತಾನಾಗಿಯೇ ನವೀಕರಿಸುತ್ತದೆ.' },
   'status.cancelled': { en: 'This order was cancelled.', hi: 'यह ऑर्डर रद्द कर दिया गया।', kn: 'ಈ ಆರ್ಡರ್ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.' },
   'status.orderAgain': { en: 'Order again', hi: 'फिर से ऑर्डर करें', kn: 'ಮತ್ತೆ ಆರ್ಡರ್ ಮಾಡಿ' },
@@ -284,6 +291,7 @@ const DICT = {
   'mock.note': { en: 'This is a demo payment screen. No money moves.', hi: 'यह डेमो भुगतान स्क्रीन है। कोई पैसा नहीं कटेगा।', kn: 'ಇದು ಡೆಮೊ ಪಾವತಿ ಪರದೆ. ಹಣ ಕಡಿತವಾಗುವುದಿಲ್ಲ.' },
   'mock.paid': { en: 'This link has already been paid.', hi: 'इस लिंक का भुगतान हो चुका है।', kn: 'ಈ ಲಿಂಕ್‌ಗೆ ಈಗಾಗಲೇ ಪಾವತಿಸಲಾಗಿದೆ.' },
   'mock.expired': { en: 'This payment link has expired.', hi: 'इस भुगतान लिंक की अवधि खत्म हो गई।', kn: 'ಈ ಪಾವತಿ ಲಿಂಕ್ ಅವಧಿ ಮುಗಿದಿದೆ.' },
+  'mock.backToOrder': { en: 'Back to your order', hi: 'अपने ऑर्डर पर वापस', kn: 'ನಿಮ್ಮ ಆರ್ಡರ್‌ಗೆ ಹಿಂತಿರುಗಿ' },
   'footer.credit': { en: 'Ordering by ServeLine', hi: 'ऑर्डरिंग: ServeLine', kn: 'ಆರ್ಡರಿಂಗ್: ServeLine' },
 
   // ---- common ----

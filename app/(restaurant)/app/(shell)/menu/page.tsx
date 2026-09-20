@@ -19,7 +19,7 @@ export default async function MenuPage() {
   const lang = await readLang()
   const menu = await getPublishedMenu(outlet.id)
   if (!menu) {
-    return <p className="m-0">No menu has been published for this outlet yet. The agent console publishes the first one (Build Spec §8).</p>
+    return <p className="m-0">No menu has been published for this outlet yet. Ask ServeLine to publish your first menu.</p>
   }
 
   return (
@@ -41,7 +41,7 @@ export default async function MenuPage() {
         <section key={c.id} className={styles.category}>
           <div className={styles.categoryHead}>
             <h2 className={styles.categoryName}>{c.name}</h2>
-            <Button size="dense" variant="ghost" href={`/app/menu/new?category=${c.id}`}>{td('menu.addItem', lang)}</Button>
+            <Button size="counter" variant="ghost" href={`/app/menu/new?category=${c.id}`}>{td('menu.addItem', lang)}</Button>
           </div>
           <ul className={styles.list}>
             {c.items.map((item) => (

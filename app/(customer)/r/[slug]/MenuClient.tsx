@@ -286,7 +286,7 @@ function Chooser({ item, lang, onAdd, onCancel }: {
         </fieldset>
       ))}
 
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {error && <p className={styles.error} role="status">{error}</p>}
 
       <div className={styles.chooserActions}>
         <Button variant="ghost" onClick={onCancel}>{t('common.cancel', lang)}</Button>

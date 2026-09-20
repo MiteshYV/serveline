@@ -16,7 +16,7 @@ import {
   auditLog, consentRecord, customerRestaurant, externalOrderCount, language, menu, order, outlet,
   restaurant, staffUser,
 } from '../schema/index.ts'
-import { type Actor, firstRow, writeAudit } from './ops.ts'
+import { type Actor, firstRow, guarded, writeAudit } from './ops.ts'
 
 type RestaurantRow = typeof restaurant.$inferSelect
 type OutletRow = typeof outlet.$inferSelect
@@ -164,9 +164,11 @@ const outletAudit = (o: OutletRow) => ({
  *
  * The trial clock starts here, as the seed does it. Ideation §10 fixes the trial's length, not
  * its start; if it should start at go-live instead, this is the one line to move.
+ *
+ * Under `guarded` (ops.ts): the owner's mobile is a parameter of two of these inserts.
  */
 export async function createRestaurant(input: CreateRestaurantInput, actor: Actor) {
-  return db.transaction(async (tx) => {
+  return guarded('restaurant.create', () => db.transaction(async (tx) => {
     const r = firstRow(
       await tx.insert(restaurant).values({
         name: input.name,
@@ -211,7 +213,7 @@ export async function createRestaurant(input: CreateRestaurantInput, actor: Acto
     await writeAudit({ ...base, action: 'staff_user.create', entity: 'staff_user', entityId: owner.id, after: ownerAudit }, tx)
 
     return { restaurant: r, outlet: o, owner }
-  })
+  }))
 }
 
 /** Build Spec §8 "Admin only: suspend and reactivate restaurants, edit plan limits". */

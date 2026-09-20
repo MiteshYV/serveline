@@ -42,12 +42,12 @@ export default async function MockPayPage({ params }: { params: Promise<{ linkId
       {link.status === 'paid' ? (
         <>
           <p className={styles.state}>{t('mock.paid', lang)}</p>
-          <Button href={statusHref} variant="primary" size="counter" block>{t('common.back', lang)}</Button>
+          <Button href={statusHref} variant="primary" size="counter" block>{t('mock.backToOrder', lang)}</Button>
         </>
       ) : expired ? (
         <>
           <p className={styles.state}>{t('mock.expired', lang)}</p>
-          <Button href={statusHref} variant="primary" size="counter" block>{t('common.back', lang)}</Button>
+          <Button href={statusHref} variant="primary" size="counter" block>{t('mock.backToOrder', lang)}</Button>
         </>
       ) : (
         <form action={payMock} className={styles.actions}>

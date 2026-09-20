@@ -16,7 +16,6 @@
   border: 1px solid var(--border-control);
   border-radius: var(--radius-3);
   background: var(--bg-card);
-  overflow: hidden;
 }
 
 .btn {
@@ -35,6 +34,11 @@
 .btn:active {
   transform: scale(0.94);
 }
+
+/* The :focus-visible ring is an outer box-shadow (§9), so the group must not clip it; the end
+   buttons carry the radius themselves instead. */
+.btn:first-child { border-radius: calc(var(--radius-3) - 1px) 0 0 calc(var(--radius-3) - 1px); }
+.btn:last-child  { border-radius: 0 calc(var(--radius-3) - 1px) calc(var(--radius-3) - 1px) 0; }
 
 .btn[aria-disabled="true"] {
   color: var(--text-disabled);
@@ -58,7 +62,6 @@
 .input {
   width: var(--touch-min);
   border-radius: 0;
-  outline: none;
 }
 
 .max {

@@ -234,6 +234,14 @@ describe('customers', () => {
     assert.equal(await customers.getConsent(bala.id, restaurant.id), null)
     assert.equal(await customers.withdrawConsent(bala.id, restaurant.id, asCustomer(bala.id)), 0)
   })
+
+  it('a failed statement reports the SQLSTATE, never the query or its parameters', async () => {
+    const ghost = '00000000-0000-4000-8000-000000000000'
+    await assert.rejects(
+      customers.upsertCustomerRestaurant({ customerId: ghost, restaurantId: restaurant.id, source: 'page' }, SYSTEM),
+      (e: unknown) => e instanceof Error && e.message === 'customer_restaurant.upsert failed (23503)',
+    )
+  })
 })
 
 // --- orders -------------------------------------------------------------------------------
@@ -375,6 +383,35 @@ describe('markPaid', () => {
     assert.equal(full?.status, 'awaiting_payment')
     assert.equal(full?.payments.length, 2)
     assert.equal(full?.events.length, 2, 'one transition, not two')
+  })
+
+  it('a resent link closes the one it replaces, so only the newest is payable', async () => {
+    const o = await placeOrder({ paymentMethod: 'upi_link' })
+    const first = await orders.attachPayment({ orderId: o.id, gateway: 'mock', linkId: 'plink_4a', amountPaise: o.totalPaise }, SYSTEM)
+    const second = await orders.attachPayment({ orderId: o.id, gateway: 'mock', linkId: 'plink_4b', amountPaise: o.totalPaise }, asOwner)
+    const payments = (await orders.getOrder(o.id))?.payments ?? []
+    assert.equal(payments.find((p) => p.id === first.id)?.status, 'unpaid', 'the replaced link is closed')
+    assert.equal(payments.find((p) => p.id === second.id)?.status, 'awaiting')
+    assert.equal((await orders.getOrder(o.id))?.paymentStatus, 'awaiting')
+  })
+
+  it('a webhook for a second link on an order the first already paid is a no-op', async () => {
+    const o = await placeOrder({ paymentMethod: 'upi_link' })
+    await orders.attachPayment({ orderId: o.id, gateway: 'mock', linkId: 'plink_5a', amountPaise: o.totalPaise }, SYSTEM)
+    await orders.attachPayment({ orderId: o.id, gateway: 'mock', linkId: 'plink_5b', amountPaise: o.totalPaise }, asOwner)
+    assert.deepEqual(await orders.markPaid('plink_5b', 'pay_5b', o.totalPaise, {}), { ok: true, orderId: o.id, alreadyPaid: false })
+    const paid = await orders.getOrder(o.id)
+    assert.equal(paid?.status, 'confirmed')
+    const paymentAudits = await auditCount('payment')
+
+    // The stale SMS, tapped after the fact.
+    assert.deepEqual(await orders.markPaid('plink_5a', 'pay_5a', o.totalPaise, {}), { ok: true, orderId: o.id, alreadyPaid: true })
+    const still = await orders.getOrder(o.id)
+    assert.equal(still?.events.length, paid?.events.length, 'no second transition')
+    const stale = still?.payments.find((p) => p.linkId === 'plink_5a')
+    assert.equal(stale?.status, 'unpaid', 'left as attachPayment closed it')
+    assert.equal(stale?.paymentId, null)
+    assert.equal(await auditCount('payment'), paymentAudits, 'nothing written')
   })
 })
 

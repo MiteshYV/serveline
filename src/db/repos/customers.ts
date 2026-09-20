@@ -2,7 +2,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { assertConsentForProfileWrite, type ConsentRecordView } from '../../core/consent.ts'
 import { db } from '../client.ts'
 import { consentRecord, customer, customerAddress, customerRestaurant } from '../schema/index.ts'
-import { type Actor, type Executor, firstRow, writeAudit } from './ops.ts'
+import { type Actor, type Executor, firstRow, guarded, writeAudit } from './ops.ts'
 
 /**
  * The customer aggregate: identity, consent, per-restaurant profile, addresses.
@@ -13,7 +13,9 @@ import { type Actor, type Executor, firstRow, writeAudit } from './ops.ts'
  *    (Build Spec §10), checked by core's `assertConsentForProfileWrite` against the live row.
  *
  * Audit snapshots never carry the phone number: `audit_log` is not one of the four tables
- * allowed to hold one, so `phone` is stripped and `phone_hash` stands in for it.
+ * allowed to hold one, so `phone` is stripped and `phone_hash` stands in for it. For the same
+ * reason every write runs under `guarded`: a failed statement's error must not carry the phone
+ * or the address line into a log either.
  */
 
 type CustomerRow = typeof customer.$inferSelect
@@ -63,7 +65,7 @@ export async function upsertCustomer(
   },
   actor: Actor,
 ): Promise<CustomerRow> {
-  return db.transaction(async (tx) => {
+  return guarded('customer.upsert', () => db.transaction(async (tx) => {
     const before = await tx.query.customer.findFirst({ where: eq(customer.phoneHash, input.phoneHash) })
 
     if (input.name !== undefined) {
@@ -107,7 +109,7 @@ export async function upsertCustomer(
       after: customerAudit(row),
     }, tx)
     return row
-  })
+  }))
 }
 
 /** A grant is a new row every time (notice texts are versioned, never edited — CLAUDE.md). */
@@ -118,7 +120,7 @@ export async function recordConsent(
   >,
   actor: Actor,
 ) {
-  return db.transaction(async (tx) => {
+  return guarded('consent.grant', () => db.transaction(async (tx) => {
     const row = firstRow(await tx.insert(consentRecord).values(input).returning(), 'consent_record')
     await writeAudit({
       actorType: actor.type,
@@ -130,7 +132,7 @@ export async function recordConsent(
       after: row,
     }, tx)
     return row
-  })
+  }))
 }
 
 /** The latest grant that has not been withdrawn, or null. Core decides whether it is *valid*. */
@@ -165,7 +167,7 @@ async function consentView(
  * Returns how many were withdrawn — zero is an ordinary answer, not an error.
  */
 export async function withdrawConsent(customerId: string, restaurantId: string, actor: Actor): Promise<number> {
-  return db.transaction(async (tx) => {
+  return guarded('consent.withdraw', () => db.transaction(async (tx) => {
     const rows = await tx
       .update(consentRecord)
       .set({ withdrawnAt: new Date() })
@@ -188,7 +190,7 @@ export async function withdrawConsent(customerId: string, restaurantId: string, 
       }, tx)
     }
     return rows.length
-  })
+  }))
 }
 
 /** Most recently used first (Build Spec §6, "saved addresses first"); never-used ones after, newest first. */
@@ -208,7 +210,7 @@ export async function saveAddress(
   input: Omit<AddressInsert, 'id' | 'createdAt' | 'lastUsedAt'>,
   actor: Actor,
 ) {
-  return db.transaction(async (tx) => {
+  return guarded('address.create', () => db.transaction(async (tx) => {
     assertConsentForProfileWrite(await consentView(tx, input.customerId, input.restaurantId), 'order_fulfilment')
 
     const row = firstRow(await tx.insert(customerAddress).values(input).returning(), 'customer_address')
@@ -234,7 +236,7 @@ export async function saveAddress(
       },
     }, tx)
     return row
-  })
+  }))
 }
 
 export async function getCustomerRestaurant(
@@ -276,7 +278,7 @@ export async function upsertCustomerRestaurant(
   },
   actor: Actor,
 ): Promise<ProfileRow> {
-  return db.transaction(async (tx) => {
+  return guarded('customer_restaurant.upsert', () => db.transaction(async (tx) => {
     if (input.order || input.notes !== undefined) {
       const view = await consentView(tx, input.customerId, input.restaurantId)
       if (input.order) assertConsentForProfileWrite(view, 'order_history')
@@ -329,5 +331,5 @@ export async function upsertCustomerRestaurant(
       after: row,
     }, tx)
     return row
-  })
+  }))
 }

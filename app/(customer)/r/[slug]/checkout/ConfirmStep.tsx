@@ -37,6 +37,8 @@ const FAILURE_KEY: Record<Exclude<PlaceOrderActionResult, { ok: true }>['reason'
   address_required: 'checkout.failed',
   code_refused: 'checkout.failed',
   not_signed_in: 'checkout.failed',
+  consent_required: 'checkout.consentRequired',
+  restaurant_closed: 'menu.closed',
   bad_request: 'checkout.failed',
   unknown_item: 'checkout.itemUnavailable',
   unknown_variant: 'checkout.itemUnavailable',
@@ -108,6 +110,8 @@ export function ConfirmStep({ slug, qs, contextKey, lang, ctx, categories, code:
       return
     }
     setError(t(FAILURE_KEY[result.reason], lang))
+    // The checkout page renders the consent step whenever consent is missing; a reload lands there.
+    if (result.reason === 'consent_required') window.setTimeout(() => window.location.reload(), 1500)
   }
 
   if (lines === null) return <p className={styles.note}>{t('action.saving', lang)}</p>

@@ -7,11 +7,11 @@ import { issueOtp, RateLimitedError, verifyOtp } from '@/auth/otp.ts'
 import { phonePepper } from '@/auth/secrets.ts'
 import { createSession, getSession } from '@/auth/session.ts'
 import { placeOrder, type PlaceOrderResult } from '@/checkout/place-order.ts'
-import { NOTICE_VERSION } from '@/core/consent.ts'
+import { hasValidConsent, NOTICE_VERSION } from '@/core/consent.ts'
 import { hashPhone, normalisePhone } from '@/core/phone.ts'
 import { checkServiceability } from '@/core/serviceability.ts'
 import {
-  findCustomerByPhoneHash, getCustomer, recordConsent, saveAddress, upsertCustomer, upsertCustomerRestaurant,
+  findCustomerByPhoneHash, getConsent, getCustomer, recordConsent, saveAddress, upsertCustomer, upsertCustomerRestaurant,
 } from '@/db/repos/index.ts'
 import type { UiKey } from '@/ui/i18n.ts'
 import { clientIp, contextQuery, currentLang, loadRestaurant, origin, parseContext, withQuery } from '../lib.ts'
@@ -172,7 +172,7 @@ const PlaceOrderPayload = z.object({
 export type PlaceOrderActionResult =
   | (PlaceOrderResult & { ok: true; statusUrl: string })
   | (PlaceOrderResult & { ok: false })
-  | { ok: false; reason: 'not_signed_in' | 'bad_request' }
+  | { ok: false; reason: 'not_signed_in' | 'consent_required' | 'bad_request' }
 
 /**
  * Confirm step. The client sends ids and quantities; everything else — prices, discount, the
@@ -187,6 +187,15 @@ export async function placeOrderAction(payload: unknown): Promise<PlaceOrderActi
   if (!customer) return { ok: false, reason: 'not_signed_in' }
 
   const [{ restaurant, outlet }, lang, host] = await Promise.all([loadRestaurant(slug), currentLang(), origin()])
+  // A session is not consent. Withdrawal is one tap and immediate (Build Spec §10), and a tab
+  // opened before it still has this button — so the gate the checkout page renders by runs
+  // again here, on the live record.
+  const consent = await getConsent(customer.id, restaurant.id)
+  const consentView = consent
+    ? { noticeVersion: consent.noticeVersion, purposes: consent.purposes, withdrawnAt: consent.withdrawnAt }
+    : undefined
+  if (!hasValidConsent(consentView, 'order_fulfilment')) return { ok: false, reason: 'consent_required' }
+
   const context = parseContext(Object.fromEntries(new URLSearchParams(qs)))
   const result = await placeOrder({
     restaurant, outlet, customer, lang, context, items, paymentMethod, addressId, origin: host,

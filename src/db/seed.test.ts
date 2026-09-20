@@ -10,6 +10,9 @@ import { applyPercentDiscount, paise } from '../core/money.ts'
 import * as schema from './schema/index.ts'
 import { seed } from './seed.ts'
 
+// node --test sets no NODE_ENV, and secrets.ts derives a dev pepper only under `next dev`.
+process.env.PHONE_HASH_PEPPER ??= 'test-pepper'
+
 // In-memory PGlite: the real dialect, no files, gone when the process ends. ./data is untouched.
 const client = new PGlite()
 const db = drizzle(client, { schema })

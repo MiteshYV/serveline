@@ -35,8 +35,8 @@ export function verifyRazorpaySignature(rawBody: string, signature: string, secr
  *   payload.payment_link.entity.reference_id  = our order id, set at link creation; not returned
  *                                               because the route joins on linkId (payment.link_id)
  *   payload.payment.entity.contact / .email   = the customer's phone and email. NOT parsed, and the
- *                                               route must strip them before storing the payload
- *                                               verbatim in payment.webhook_payload — CLAUDE.md
+ *                                               route keeps only an allow-listed projection of the
+ *                                               event in payment.webhook_payload — CLAUDE.md
  *                                               allows a phone number on four tables and that is
  *                                               not one of them.
  *

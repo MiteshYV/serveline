@@ -69,7 +69,7 @@ export default async function AddressLinkPage({ params, searchParams }: Props) {
       <form action={confirmAddressAction} className={styles.form}>
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="token" value={token} />
-        {err === 'address' && <p className={styles.error} role="alert">{t('address.pincodeInvalid', lang)}</p>}
+        {err === 'address' && <p className={styles.error} role="status">{t('address.pincodeInvalid', lang)}</p>}
         <Field id="line1" label={t('address.line1', lang)}>
           {(input) => <input {...input} name="line1" className={fieldStyles.control} required minLength={3} maxLength={200} defaultValue={rough?.line1 ?? order.notes ?? ''} autoComplete="street-address" />}
         </Field>

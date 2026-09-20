@@ -22,6 +22,11 @@ const DICT = {
     hi: 'इस नंबर का कोई स्टाफ़ खाता नहीं है। मालिक से जोड़ने को कहें।',
     kn: 'ಈ ಸಂಖ್ಯೆಗೆ ಸಿಬ್ಬಂದಿ ಖಾತೆ ಇಲ್ಲ. ಸೇರಿಸಲು ಮಾಲೀಕರನ್ನು ಕೇಳಿ.',
   },
+  'login.suspended': {
+    en: 'This restaurant’s ServeLine account is suspended. Contact ServeLine to reactivate it.',
+    hi: 'इस रेस्तरां का ServeLine खाता निलंबित है। इसे फिर से चालू करने के लिए ServeLine से संपर्क करें।',
+    kn: 'ಈ ರೆಸ್ಟೋರೆಂಟ್‌ನ ServeLine ಖಾತೆ ಅಮಾನತುಗೊಂಡಿದೆ. ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಲು ServeLine ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.',
+  },
   'login.rateLimited': {
     en: 'Too many attempts. Wait a few minutes and try again.',
     hi: 'बहुत बार कोशिश हो गई। कुछ मिनट रुककर फिर कोशिश करें।',
@@ -51,6 +56,11 @@ const DICT = {
   'board.convertCod': { en: 'Convert to cash on delivery', hi: 'डिलीवरी पर नकद में बदलें', kn: 'ಡೆಲಿವರಿ ವೇಳೆ ನಗದಿಗೆ ಬದಲಿಸಿ' },
   'board.stateChanged': { en: 'Order {n} is now {state}', hi: 'ऑर्डर {n} अब {state}', kn: 'ಆರ್ಡರ್ {n} ಈಗ {state}' },
   'board.tableQr': { en: 'Table QR to print', hi: 'प्रिंट के लिए टेबल QR', kn: 'ಮುದ್ರಿಸಲು ಟೇಬಲ್ QR' },
+  // A sentence of its own: slicing `empty.allDone` at "." broke in Hindi, which ends on a danda (।).
+  'board.ordersToday': { en: '{n} orders today', hi: 'आज {n} ऑर्डर', kn: 'ಇಂದು {n} ಆರ್ಡರ್‌ಗಳು' },
+
+  // ---- Monday aggregator nag (design §7.8) ----
+  'nag.editHint': { en: 'You can change this number before you save.', hi: 'सहेजने से पहले यह संख्या बदल सकते हैं।', kn: 'ಉಳಿಸುವ ಮೊದಲು ಈ ಸಂಖ್ಯೆಯನ್ನು ಬದಲಿಸಬಹುದು.' },
 
   // ---- order detail ----
   'detail.timeline': { en: 'Timeline', hi: 'समयरेखा', kn: 'ಕಾಲರೇಖೆ' },

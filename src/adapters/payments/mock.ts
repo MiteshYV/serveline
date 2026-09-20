@@ -85,7 +85,7 @@ export const mockPayments = {
 
     // Mirrors Razorpay's payment_link.paid payload — field mapping in razorpay.ts. `contact` and
     // `email` are deliberately absent from `payment.entity`: the real event carries them and the
-    // route must strip them before persisting (CLAUDE.md, four tables).
+    // route stores an allow-listed projection of the event, never the raw payload (CLAUDE.md, four tables).
     const event = {
       entity: 'event',
       account_id: 'acc_mock',

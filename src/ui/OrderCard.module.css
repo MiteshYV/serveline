@@ -126,14 +126,14 @@
   white-space: nowrap;
 }
 
-/* ---- Lean-in layer (40 cm). The row is the expand control; it is a 44px target. ---- */
+/* ---- Lean-in layer (40 cm). The row is the expand control: a 56px counter target (§6.1). ---- */
 .leanIn {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-6);
   width: 100%;
-  min-height: var(--touch-min);
+  min-height: var(--touch-counter);
   padding: 0;
   border: 0;
   background: transparent;

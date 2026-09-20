@@ -14,7 +14,10 @@ import { isLang, LANG_COOKIE } from '@/ui/lang.ts'
 export const loadRestaurant = cache(async (slug: string) => {
   const restaurant = await getRestaurantBySlug(slug)
   const outlet = restaurant?.outlets[0]
-  if (!restaurant || !outlet) notFound()
+  // A suspended or churned restaurant (Build Spec §8, admin "suspend") has no customer surface:
+  // the same 404 as a slug that never existed, so no route under /r/{slug} can serve a menu the
+  // restaurant may not take orders from.
+  if (!restaurant || !outlet || restaurant.status === 'suspended' || restaurant.status === 'churned') notFound()
   return { restaurant, outlet }
 })
 

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { vendorMode } from '@/adapters/mode.ts'
+import { mockPayments } from '@/adapters/payments/mock.ts'
 import { getSession } from '@/auth/session.ts'
 import { formatINR, paise } from '@/core/money.ts'
 import { isTerminal } from '@/core/orders.ts'
@@ -11,7 +12,7 @@ import { orderStateLabel, t } from '@/ui/i18n.ts'
 import { StateGlyph } from '@/ui/StateGlyph.tsx'
 import { StatusChip } from '@/ui/StatusChip.tsx'
 import { currentLang, loadRestaurant, param, type SearchParams } from '../../lib.ts'
-import { withdrawConsentAction } from './actions.ts'
+import { reissuePaymentLinkAction, withdrawConsentAction } from './actions.ts'
 import { StatusPoller } from './StatusPoller.tsx'
 import styles from '../../customer.module.css'
 
@@ -43,10 +44,19 @@ export default async function OrderStatusPage({ params, searchParams }: Props) {
     : undefined
 
   const awaiting = order.paymentMethod === 'upi_link' && order.paymentStatus === 'awaiting' && !isTerminal(order.status)
-  const pendingLink = awaiting ? order.payments.find((p) => p.status === 'awaiting' && p.linkId) : undefined
-  // ponytail: `payment` has no url column, so only the mock's link can be rebuilt here; a real
-  // Razorpay short_url reaches the customer by SMS. Storing it is a one-column migration.
-  const payHref = pendingLink?.linkId && vendorMode() === 'mock' ? `/mock/pay/${pendingLink.linkId}` : null
+  // Newest first: a resent link (Build Spec §7) or "Try again" below adds a row, and the customer
+  // must be offered the live one, not the first ever issued.
+  const pendingLink = awaiting
+    ? order.payments.filter((p) => p.status === 'awaiting' && p.linkId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
+    : undefined
+  // ponytail: `payment` has no url or expiry column, so only the mock's link can be rebuilt, and
+  // judged expired, here; a real Razorpay short_url reaches the customer by SMS. Storing them is
+  // a two-column migration.
+  const mockLink = pendingLink?.linkId && vendorMode() === 'mock' ? mockPayments.get(pendingLink.linkId) : undefined
+  // Build Spec §9: a link lives 30 minutes. Past that, "Pay now" is a dead end (design §7.10.4).
+  const expired = mockLink?.status === 'created' && Date.now() > mockLink.expiresAt.getTime()
+  const payHref = pendingLink?.linkId && vendorMode() === 'mock' && !expired ? `/mock/pay/${pendingLink.linkId}` : null
+  const tel = outlet.displayPhone ?? outlet.ownerMobile
 
   const paymentKey = order.paymentStatus === 'paid'
     ? 'payment.paid'
@@ -67,19 +77,32 @@ export default async function OrderStatusPage({ params, searchParams }: Props) {
         <p className={styles.statusMsg}>
           {order.status === 'cancelled'
             ? t('status.cancelled', lang)
-            : awaiting
-              ? t('status.awaitingPayment', lang)
-              : t('status.thanks', lang, { restaurant: restaurant.name })}
+            : expired
+              ? t('status.linkExpired', lang)
+              : awaiting
+                ? t('status.awaitingPayment', lang)
+                : t('status.thanks', lang, { restaurant: restaurant.name })}
         </p>
         {order.tableNo && (
-          <span className={styles.locator}>TABLE <span className="num">{order.tableNo}</span></span>
+          <span className={styles.locator}>{t('checkout.table', lang, { n: order.tableNo })}</span>
         )}
       </div>
 
       {awaiting && (
-        payHref
-          ? <Button href={payHref} variant="brand" size="counter" block>{t('status.payNow', lang, { amount: formatINR(paise(order.totalPaise)) })}</Button>
-          : <p className={styles.note}>{t('status.paySms', lang)}</p>
+        // Design §7.10.4: the glyph, one sentence and the amount are above; here the two actions,
+        // Try again and Pay at the counter. Never strand a diner with a dead link.
+        expired
+          ? <>
+              <form action={reissuePaymentLinkAction}>
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="orderId" value={order.id} />
+                <Button type="submit" variant="brand" size="counter" block>{t('payment.tryAgain', lang)}</Button>
+              </form>
+              {tel && <Button href={`tel:${tel}`} variant="ghost" size="counter" block>{t('payment.payAtCounter', lang)}</Button>}
+            </>
+          : payHref
+            ? <Button href={payHref} variant="brand" size="counter" block>{t('status.payNow', lang, { amount: formatINR(paise(order.totalPaise)) })}</Button>
+            : <p className={styles.note}>{t('status.paySms', lang)}</p>
       )}
 
       <section className={styles.card}>

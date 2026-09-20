@@ -197,11 +197,11 @@ export function OrderCard({ order, lang, onAction, extraActions }: Props) {
             <span className={styles.channel}>{t(`channel.${order.channel}`, lang)}</span>
           </div>
 
+          {/* Design §9: the visible text is the name ("3 items · ₹640 · Paid"); aria-expanded says what the tap does. */}
           <button
             type="button"
             className={styles.leanIn}
             aria-expanded={expanded}
-            aria-label={t(expanded ? 'card.hideItems' : 'card.showItems', lang)}
             onClick={() => setExpanded((v) => !v)}
           >
             <span className="num">{itemCount}</span>

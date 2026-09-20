@@ -19,8 +19,17 @@ import { phonePepper, sessionSecret } from './secrets.ts'
 /** Build Spec §10: "OTPs 10 minutes". */
 const OTP_TTL_MS = 10 * 60 * 1000
 
-/** Build Spec §10: "OTP endpoints rate-limited per phone and per IP". Five per ten minutes. */
-const limiter = createLimiter(5, 10 * 60 * 1000)
+/** Build Spec §10: "OTP endpoints rate-limited per phone and per IP". Five per ten minutes per phone. */
+const phoneLimiter = createLimiter(5, 10 * 60 * 1000)
+
+/**
+ * Per IP the ceiling is far higher, because one address is many people: every table-QR diner on
+ * the restaurant's Wi-Fi leaves through its one public IP, and Jio's CGNAT puts a whole
+ * neighbourhood behind one, so five would refuse the sixth diner at a busy dinner. Sixty per ten
+ * minutes still caps one address at an SMS every ten seconds; the per-phone limit is what stops
+ * a brute force.
+ */
+const ipLimiter = createLimiter(60, 10 * 60 * 1000)
 
 export class RateLimitedError extends Error {
   constructor() {
@@ -38,7 +47,8 @@ export function mintChallenge(phoneHash: string, code: string, now = Date.now())
 
 /**
  * Sends a six-digit code by SMS and returns the challenge to verify it against. Throws
- * `RateLimitedError` on the sixth request in ten minutes for the phone, or for `ip` when given.
+ * `RateLimitedError` on the sixth request in ten minutes for the phone, or the sixty-first for
+ * `ip` when given.
  * `devCode` is returned only under `VENDOR_MODE=mock`, so a demo can log in without a handset.
  * The code is never logged.
  *
@@ -51,8 +61,8 @@ export async function issueOtp(
   ctx: { origin: string; restaurant?: string; language?: SmsLanguage; ip?: string },
 ): Promise<{ challenge: string; devCode?: string }> {
   const phoneHash = hashPhone(phoneE164, phonePepper())
-  if (!limiter.hit(`issue:phone:${phoneHash}`)) throw new RateLimitedError()
-  if (ctx.ip !== undefined && !limiter.hit(`issue:ip:${ctx.ip}`)) throw new RateLimitedError()
+  if (!phoneLimiter.hit(`issue:${phoneHash}`)) throw new RateLimitedError()
+  if (ctx.ip !== undefined && !ipLimiter.hit(ctx.ip)) throw new RateLimitedError()
 
   const code = randomInt(0, 1_000_000).toString().padStart(6, '0')
   const challenge = mintChallenge(phoneHash, code)
@@ -73,7 +83,7 @@ export async function issueOtp(
  */
 export async function verifyOtp(phoneE164: string, code: string, challenge: string): Promise<boolean> {
   const phoneHash = hashPhone(phoneE164, phonePepper())
-  if (!limiter.hit(`verify:${phoneHash}`)) throw new RateLimitedError()
+  if (!phoneLimiter.hit(`verify:${phoneHash}`)) throw new RateLimitedError()
   if (!/^\d{6}$/.test(code)) return false
 
   const parts = challenge.split('.')

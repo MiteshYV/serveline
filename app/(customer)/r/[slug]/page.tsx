@@ -75,9 +75,9 @@ export default async function MenuPage({ params, searchParams }: Props) {
   return (
     <>
       <p className={styles.context}>
-        {ctx.kind === 'table'
-          ? <><span className={styles.locator}>TABLE</span> <span className="num">{ctx.tableNo}</span></>
-          : <span className={styles.locator}>DELIVERY</span>}
+        <span className={styles.locator}>
+          {ctx.kind === 'table' ? t('checkout.table', lang, { n: ctx.tableNo }) : t('checkout.delivery', lang)}
+        </span>
         {' · '}{outlet.name}
       </p>
 

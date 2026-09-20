@@ -83,14 +83,19 @@
   padding: var(--space-16);
 }
 
+/* "Have a code?": one row, the field growing and Apply beside it on the field's bottom edge. Row
+   overrides the toolbar's column, whose cross-axis flex-end otherwise squashes the field to its
+   intrinsic width (design §7.4). */
 .codeForm {
   display: flex;
+  flex-direction: row;
   gap: var(--space-8);
   align-items: flex-end;
 }
 
 .codeForm > :first-child {
   flex: 1;
+  min-width: 0;
 }
 
 /* Category jump links: a horizontal strip, the active one underlined in brand ink (design §3.5). */
@@ -482,11 +487,11 @@
   line-height: var(--lh-ui);
 }
 
+/* "Table 7" / "Delivery": translated, so no tracking and no numeric-only face (design §4.2). */
 .locator {
-  font-family: var(--font-numeric);
   font-size: var(--text-label);
   font-weight: var(--fw-bold);
-  letter-spacing: 0.02em; /* Latin-only system label (design §7.1) */
+  line-height: var(--lh-ui);
   color: var(--text-secondary);
 }
 

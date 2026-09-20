@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { publishMenu, setItemAvailability, upsertItem, type UpsertItemInput } from '@/db/repos/index.ts'
+import { getMenuForEditing, publishMenu, setItemAvailability, upsertItem, type UpsertItemInput } from '@/db/repos/index.ts'
 import { currentOutlet } from '../../_lib/session.ts'
 import { parseINR } from '@/core/money.ts'
 
@@ -11,7 +11,13 @@ import { parseINR } from '@/core/money.ts'
 export async function setAvailability(form: FormData): Promise<void> {
   const parsed = z.object({ itemId: z.uuid(), available: z.enum(['0', '1']) }).safeParse({ itemId: form.get('itemId'), available: form.get('available') })
   if (!parsed.success) return
-  const { actor } = await currentOutlet()
+  const { outlet, actor } = await currentOutlet()
+  // Item ids are public — they ship to every browser on /r/{slug} — so the id alone proves
+  // nothing. The item must be on this outlet's menu, as saveItem checks below (Build Spec §10:
+  // staff act on their own restaurant). The editor's view, not the published one: a draft's
+  // items are this outlet's too.
+  const menu = await getMenuForEditing(outlet.id)
+  if (!menu || !menu.items.some((i) => i.id === parsed.data.itemId)) return
   await setItemAvailability(parsed.data.itemId, parsed.data.available === '1', actor)
   revalidatePath('/app/menu')
   revalidatePath('/app/orders/new')

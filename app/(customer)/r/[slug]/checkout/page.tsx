@@ -89,7 +89,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
             <input type="checkbox" name="agree" required />
             <span>{t('consent.label', lang, { restaurant: restaurant.name })}</span>
           </label>
-          {err === 'consent' && <p className={styles.error} role="alert">{t('consent.required', lang)}</p>}
+          {err === 'consent' && <p className={styles.error} role="status">{t('consent.required', lang)}</p>}
           <Button type="submit" variant="brand" size="counter" block>{t('checkout.continue', lang)}</Button>
         </form>
       </Step>
@@ -130,7 +130,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
           <form action={saveAddressAction} className={styles.form}>
             {hidden}
             <h3 className={styles.subhead}>{t('address.new', lang)}</h3>
-            {err === 'address' && <p className={styles.error} role="alert">{t('address.pincodeInvalid', lang)}</p>}
+            {err === 'address' && <p className={styles.error} role="status">{t('address.pincodeInvalid', lang)}</p>}
             <Field id="line1" label={t('address.line1', lang)}>
               {(input) => <input {...input} name="line1" className={fieldStyles.control} required minLength={3} maxLength={200} autoComplete="street-address" />}
             </Field>

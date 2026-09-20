@@ -5,7 +5,7 @@
 import { asc, eq, type SQL } from 'drizzle-orm'
 import { db } from '../client.ts'
 import { outlet, restaurant } from '../schema/index.ts'
-import { type Actor, firstRow, writeAudit } from './ops.ts'
+import { type Actor, firstRow, guarded, writeAudit } from './ops.ts'
 
 type OutletRow = typeof outlet.$inferSelect
 
@@ -66,7 +66,8 @@ function settingsView(row: OutletRow): Record<SettingsKey, unknown> {
 
 /**
  * Authorisation (Build Spec §10: `staff` cannot change settings) is the route's job, before the
- * patch reaches here. Keys outside the §7 list are dropped, not written.
+ * patch reaches here. Keys outside the §7 list are dropped, not written. Under `guarded`
+ * (ops.ts), because two of the keys are phone numbers.
  */
 export async function updateOutletSettings(outletId: string, patch: OutletSettingsPatch, actor: Actor) {
   const set: OutletSettingsPatch = {}
@@ -74,7 +75,7 @@ export async function updateOutletSettings(outletId: string, patch: OutletSettin
     if (patch[key] !== undefined) Object.assign(set, { [key]: patch[key] })
   }
 
-  return db.transaction(async (tx) => {
+  return guarded('outlet.settings', () => db.transaction(async (tx) => {
     const before = await tx.query.outlet.findFirst({ where: eq(outlet.id, outletId) })
     if (!before) throw new Error(`No outlet ${outletId}`)
     if (Object.keys(set).length === 0) return before
@@ -93,5 +94,5 @@ export async function updateOutletSettings(outletId: string, patch: OutletSettin
       after: settingsView(after),
     }, tx)
     return after
-  })
+  }))
 }
