@@ -1,4 +1,5 @@
 import { relations } from 'drizzle-orm'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { boolean, index, integer, jsonb, pgTable, text, varchar } from 'drizzle-orm/pg-core'
 import { createdAt, fk, id, nullableFk, utc } from './_shared.ts'
 import {
@@ -8,6 +9,7 @@ import { customer, customerAddress } from './customers.ts'
 import { itemVariant, menuItem } from './menu.ts'
 import { outlet, restaurant, staffUser } from './tenancy.ts'
 import { discountCode } from './winback.ts'
+import { call } from './calls.ts'
 
 // Build Spec §4 "Orders and payments". Every money column is integer paise (CLAUDE.md); there is
 // no rupee value and no decimal column anywhere in this file.
@@ -46,6 +48,8 @@ export const order = pgTable('order', {
   addressId: nullableFk('address_id').references(() => customerAddress.id, { onDelete: 'set null' }),
   addressStatus: addressStatus('address_status').notNull().default('na'),
 
+  /** The AI call that placed this order (Build Spec §4); M2 migration. Lazy-thunk cycle with calls.ts. */
+  callId: nullableFk('call_id').references((): AnyPgColumn => call.id, { onDelete: 'set null' }),
   notes: text('notes'),
 
   // `call_id` is deliberately absent. M1 has no call pipeline, and the M2 migration adds the

@@ -8,6 +8,13 @@
       "when": 1789754883285,
       "tag": "0000_m1_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789919061513,
+      "tag": "0001_m2_calls",
+      "breakpoints": true
     }
   ]
 }

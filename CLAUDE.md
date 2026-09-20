@@ -19,7 +19,8 @@ Portfolio-first, pilot-ready. Every external vendor sits behind an adapter inter
 When a real account arrives, it is a new implementation of the same interface plus an environment
 variable — never a change to calling code.
 
-Current milestone: **M1** — ordering page and dashboard, no AI. See Build Spec §14.
+Current milestone: **M2** — the voice assistant's brain and two vendor-free transports (ADR 0004).
+M1 is complete and browser-verified. See Build Spec §14 and docs/superpowers/specs/.
 
 ## Conventions
 
@@ -42,6 +43,9 @@ Current milestone: **M1** — ordering page and dashboard, no AI. See Build Spec
   free of anything web-shaped.
 - `src/db/` — Drizzle schema, migrations, seed, and the repository functions.
 - `src/adapters/` — one folder per vendor concern. Interface, mock, and (later) the real client.
+- `src/voice/` — the call assistant's brain: prompt, LLM loop, tool handlers, guardrails, ledger.
+  No `next` imports; called by `app/api/v1/voice/*` and by tests. Tool schemas are in
+  `contracts/voice-tools.json`, never inlined.
 - `src/auth/` — OTP challenges and session cookies. Stateless by design at M1: the OTP lives in a
   signed challenge, not a table, because Build Spec §10 gives it a ten-minute life and nothing else.
 - `src/ui/` — design tokens and shared components. Tokens are CSS custom properties; do not
