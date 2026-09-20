@@ -1,4 +1,5 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 import * as schema from './schema/index.ts'
@@ -21,6 +22,9 @@ function open() {
   if (url.startsWith('file://')) {
     const dir = url.slice('file://'.length)
     mkdirSync(dir, { recursive: true }) // PGlite's own mkdir is not recursive
+    // A dev server killed mid-run leaves postmaster.pid behind, and PGlite then aborts inside the
+    // WASM with no useful message. PGlite is single-process, so a pid file here is always stale.
+    rmSync(join(dir, 'postmaster.pid'), { force: true })
     return drizzlePglite(new PGlite(dir), { schema })
   }
 
