@@ -38,6 +38,9 @@ export const PRICES = {
   // and costs nothing. Priced here so the loop treats every adapter alike and an unpriced
   // provider still throws below.
   mock: { model: 'mock', inPaisePerMTok: 0, outPaisePerMTok: 0 },
+  // A model on the restaurant's own machine has no per-token price. Electricity is not a token
+  // cost, and Build Spec §13 bills calls, not watts.
+  ollama: { model: 'local', inPaisePerMTok: 0, outPaisePerMTok: 0 },
 } as const satisfies Record<string, { model: string; inPaisePerMTok: number; outPaisePerMTok: number }>
 
 export type PricedProvider = keyof typeof PRICES

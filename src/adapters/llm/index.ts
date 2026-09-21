@@ -2,6 +2,7 @@ import { vendorMode } from '../mode.ts'
 import { anthropicLlm } from './anthropic.ts'
 import { geminiLlm } from './gemini.ts'
 import { mockLlmAdapter } from './mock.ts'
+import { ollamaLlm } from './ollama.ts'
 
 /**
  * The LLM behind the call assistant. Build Spec §9 "LLM": an adapter interface with two providers
@@ -68,7 +69,7 @@ export class LlmError extends Error {
   }
 }
 
-type Provider = 'gemini' | 'anthropic' | 'mock' | 'failing'
+type Provider = 'gemini' | 'anthropic' | 'ollama' | 'mock' | 'failing'
 
 /**
  * A test hook, and only that: `LLM_PRIMARY_PROVIDER=failing` (or SECONDARY) selects an adapter
@@ -104,6 +105,8 @@ export function llm(which: 'primary' | 'secondary'): LlmAdapter {
   }
   if (provider === 'mock') return mockLlmAdapter
   if (provider === 'failing') return failingLlmAdapter
+  // A model on this machine: no key to check, and the host is the only thing that could be wrong.
+  if (provider === 'ollama') return ollamaLlm()
 
   const key = process.env[keyVar]
   if (!key) throw new Error(`not configured: ${keyVar}`)
