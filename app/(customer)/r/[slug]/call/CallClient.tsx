@@ -27,6 +27,9 @@ const BCP47: Record<Lang, string> = { hi: 'hi-IN', en: 'en-IN', kn: 'kn-IN' }
 
 /** Design "Guardrails", silence: after "Are you there?" the call ends 30 s later without speech. */
 const SILENCE_MS = 30_000
+/** Build Spec §5.4: a turn longer than this gets a spoken filler, once. A turn is two to four
+ *  model calls, so on the measured numbers (docs/adr/0006) most turns cross it. */
+const FILLER_AFTER_MS = 1_200
 
 /**
  * Empty recogniser runs in a row before the prompt (design: "twice"), and the last run the page
@@ -410,6 +413,16 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     setError(null)
     append('customer', said)
     setActivity('thinking')
+
+    // Build Spec §5.4: "Play a short filler ('ek second') when a turn exceeds 1.2 s, once per turn
+    // at most." A turn is two to four model calls, so it routinely does; without this the caller
+    // hears nothing at all and starts talking over the reply. `hush()` inside speak() cuts the
+    // filler off when the real reply arrives, which is what a person would do too.
+    const filler = window.setTimeout(() => {
+      if (callId.current === id) speak(s.thinking, lang, () => undefined)
+    }, FILLER_AFTER_MS)
+    const done = () => window.clearTimeout(filler)
+
     let res: Response
     try {
       res = await fetch(`/api/v1/voice/calls/${id}/turn`, {
@@ -418,12 +431,14 @@ export function CallClient({ slug, restaurant, lang }: Props) {
         body: JSON.stringify({ text: said, lang, ...(via.confidence === undefined ? {} : { confidence: via.confidence }) }),
       })
     } catch {
+      done()
       if (callId.current !== id) return
       setActivity(null)
       setError('send')
       if (via.typed) setText(said)
       return
     }
+    done()
     // The caller hung up while this was in flight: the reply is nobody's now.
     if (callId.current !== id) return
     if (res.status === 409) {
