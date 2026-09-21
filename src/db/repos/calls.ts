@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, getTableColumns, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, gte, isNull, lt, sql } from 'drizzle-orm'
 import { paise } from '../../core/money.ts'
 import { db } from '../client.ts'
-import { call, callCost, callTurn } from '../schema/index.ts'
+import { call, callCost, callOutcome, callTag, callTransport, callTurn, customer, outlet, restaurant } from '../schema/index.ts'
 import { type Actor, firstRow, guarded, writeAudit } from './ops.ts'
 
 /**
@@ -21,6 +21,11 @@ import { type Actor, firstRow, guarded, writeAudit } from './ops.ts'
 export type CallRow = typeof call.$inferSelect
 export type CallTurnRow = typeof callTurn.$inferSelect
 export type CallCostRow = typeof callCost.$inferSelect
+
+// The enum values, for the console's filters and the tag <select> — pages read the repo, not the schema.
+export const CALL_OUTCOMES = callOutcome.enumValues
+export const CALL_TRANSPORTS = callTransport.enumValues
+export const CALL_TAGS = callTag.enumValues
 
 /** One entry of `call_turn.tool_calls`: Build Spec §5.5, every tool call logged with its arguments and result. */
 export type ToolCallRecord = { name: string; args: unknown; result: unknown; ms: number }
@@ -171,12 +176,19 @@ export async function getCall(callId: string) {
   )
 }
 
-export type CallListRow = CallRow & { totalPaise: number }
+export type CallListRow = CallRow & {
+  totalPaise: number
+  restaurantName: string
+  outletName: string
+  /** Caller utterances only — the number the allowance rule counts (M2 design "Cost ledger"). */
+  callerTurns: number
+}
 
-/** The call list (M2 design "Surfaces"): newest first, with the ledger total and nothing heavier. */
+/** The call list (M2 design "Surfaces"): newest first, with the outlet's name, the caller-turn count and the ledger total. */
 export async function listCalls(input: {
   outletId?: string
   outcome?: NonNullable<CallRow['outcome']>
+  transport?: CallRow['transport']
   limit: number
   /** Paging cursor: calls started strictly before this instant, i.e. the last row's `startedAt`. */
   before?: Date
@@ -186,15 +198,80 @@ export async function listCalls(input: {
       ...getTableColumns(call),
       // Written out, not `${callCost.totalPaise}`: see `listBatches` in codes.ts.
       totalPaise: sql<number>`coalesce((select cc.total_paise from call_cost cc where cc.call_id = "call".id), 0)::int`,
+      restaurantName: restaurant.name,
+      outletName: outlet.name,
+      callerTurns: sql<number>`(select count(*) from call_turn ct where ct.call_id = "call".id and ct.speaker = 'customer')::int`,
     })
     .from(call)
+    .innerJoin(outlet, eq(call.outletId, outlet.id))
+    .innerJoin(restaurant, eq(outlet.restaurantId, restaurant.id))
     .where(and(
       input.outletId ? eq(call.outletId, input.outletId) : undefined,
       input.outcome ? eq(call.outcome, input.outcome) : undefined,
+      input.transport ? eq(call.transport, input.transport) : undefined,
       input.before ? lt(call.startedAt, input.before) : undefined,
     ))
     .orderBy(desc(call.startedAt), desc(call.id))
     .limit(input.limit)
+}
+
+/**
+ * /app/today's "AI calls used" (M2 design "Cost ledger"): calls started in [from, to) with
+ * `counts_toward_allowance` set, Exotel only.
+ *
+ * Decision: Ideation §10 defines an AI-handled call as "any inbound call the AI answers that
+ * lasts longer than ten seconds" — a telephone call. A browser call is the mic page or the
+ * agent console's simulator: a demo, not an inbound call, and not billable. So `transport =
+ * 'exotel'` here, and the agent console's call list shows browser calls under their own
+ * transport column and filter instead. The flag itself is still set on browser calls (loop.ts,
+ * ≥ 2 caller turns) so the metric can be inspected per call before the first Exotel number exists.
+ */
+export async function countAllowanceCalls(outletId: string, from: Date, to: Date): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(call)
+    .where(and(
+      eq(call.outletId, outletId),
+      eq(call.countsTowardAllowance, true),
+      eq(call.transport, 'exotel'),
+      gte(call.startedAt, from),
+      lt(call.startedAt, to),
+    ))
+  return row?.n ?? 0
+}
+
+export type CallerChoice = {
+  id: string
+  /** From `customer.name`, which only exists under a consent; null for a phone-only row. */
+  firstName: string | null
+  /** The last four digits and nothing more: the number itself never leaves the repo. */
+  phoneTail: string
+  phoneHash: string
+  preferredLanguage: CallRow['languageDetected']
+}
+
+/**
+ * The simulator's caller picker (M2 design "Surfaces": "seeded customers appear as choices").
+ * Lives here rather than customers.ts because it is the call console's read and its projection
+ * is shaped for it: the hash the loop identifies the caller by, a first name and a masked tail
+ * to pick them by — the full number stays on `customer` (CLAUDE.md).
+ *
+ * ponytail: every customer, oldest first, capped at 50. A pilot has a handful; the upgrade is a
+ * search box over the name when a restaurant has more customers than fit in a <select>.
+ */
+export async function listCallers(): Promise<CallerChoice[]> {
+  const rows = await db
+    .select({ id: customer.id, name: customer.name, phone: customer.phone, phoneHash: customer.phoneHash, preferredLanguage: customer.preferredLanguage })
+    .from(customer)
+    .orderBy(asc(customer.createdAt), asc(customer.id))
+    .limit(50)
+  return rows.map((r) => ({
+    id: r.id,
+    firstName: r.name?.trim().split(/\s+/)[0] ?? null,
+    phoneTail: r.phone.slice(-4),
+    phoneHash: r.phoneHash,
+    preferredLanguage: r.preferredLanguage,
+  }))
 }
 
 /** The review screen's one write (M2 design "Surfaces"): a tag for M4's tuning loop (Build Spec §8). */

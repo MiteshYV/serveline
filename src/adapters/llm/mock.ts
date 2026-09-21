@@ -121,9 +121,13 @@ function langOf(system: string): Lang {
   return (m?.[1]?.toLowerCase() as Lang | undefined) ?? 'en'
 }
 
-/** `Usual order: 2 × Masala Dosa, 1 × Filter Coffee` → [{ name, qty }]. Also accepts `x` and `2 Masala Dosa`. */
+/**
+ * `Usual order: 2 × Masala Dosa, 1 × Filter Coffee` → [{ name, qty }]. Also accepts `x` and
+ * `2 Masala Dosa`. The list ends at the first `;`: prompt.ts follows it with the price and the
+ * guidance sentence on the same line, which are not items.
+ */
 export function usualOrderOf(system: string): { name: string; qty: number }[] {
-  const line = /usual order[^:\n]*:\s*([^\n]+)/i.exec(system)?.[1]
+  const line = /usual order[^:\n]*:\s*([^\n;]+)/i.exec(system)?.[1]
   if (!line) return []
   return line.split(/,|;|\band\b|\baur\b/).map((part) => {
     const p = part.trim().replace(/\.$/, '')

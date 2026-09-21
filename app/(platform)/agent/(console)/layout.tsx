@@ -21,6 +21,8 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
         </a>
         <nav className={c.navLinks} aria-label="Console">
           <NavLink href="/agent">Restaurants</NavLink>
+          <NavLink href="/agent/calls">Calls</NavLink>
+          <NavLink href="/agent/calls/simulate">Simulator</NavLink>
           {session.role === 'admin' && <NavLink href="/agent/audit">Audit log</NavLink>}
           {vendorMode() === 'mock' && <NavLink href="/agent/sms">Mock SMS inbox</NavLink>}
           <NavLink href="/agent/styleguide">Styleguide</NavLink>

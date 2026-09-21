@@ -113,7 +113,12 @@ test('"same as last time" searches every usual item and adds each with its quant
   assert.match(reply, /2 × Masala Dosa, 1 × Filter Coffee/)
   assert.match(turn(system, history, 'pickup', tools), /placed/)
 
-  assert.deepEqual(usualOrderOf('Usual order: Idli Vada x 3; 2 Set Dosa'), [{ name: 'Idli Vada', qty: 3 }, { name: 'Set Dosa', qty: 2 }])
+  assert.deepEqual(usualOrderOf('Usual order: Idli Vada x 3, 2 Set Dosa'), [{ name: 'Idli Vada', qty: 3 }, { name: 'Set Dosa', qty: 2 }])
+  // prompt.ts puts the price and the "on a yes" guidance after a `;` on the same line — not items.
+  assert.deepEqual(
+    usualOrderOf('- Usual order: Masala Dosa × 2, Filter Coffee × 2; ₹300 at today\'s prices. On a yes, search_menu and add_to_cart each item.'),
+    [{ name: 'Masala Dosa', qty: 2 }, { name: 'Filter Coffee', qty: 2 }],
+  )
   assert.deepEqual(usualOrderOf('nothing here'), [])
 })
 

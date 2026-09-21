@@ -2,7 +2,7 @@ import { estimateInvoice, CALL_ALLOWANCE } from '@/core/billing.ts'
 import { istDate, istMonthStart, istMondayOf, istDateStart } from '@/core/calendar.ts'
 import { formatINR, paise } from '@/core/money.ts'
 import {
-  channelOrderValue, deliveredCount, externalOrdersBetween, ordersByChannel, topCustomers, topDishes,
+  channelOrderValue, countAllowanceCalls, deliveredCount, externalOrdersBetween, ordersByChannel, topCustomers, topDishes,
 } from '@/db/repos/index.ts'
 import { currentOutlet } from '../../_lib/session.ts'
 import settings from '../settings/Settings.module.css'
@@ -36,7 +36,7 @@ export default async function TodayPage() {
   const lastMonthStart = istMonthStart(now, 1)
   const weekStart = istDateStart(istMondayOf(now))
 
-  const [byChannelToday, byChannelMonth, deliveredMonth, deliveredLast, extMonth, extLast, customers, dishes, channelValue] =
+  const [byChannelToday, byChannelMonth, deliveredMonth, deliveredLast, extMonth, extLast, customers, dishes, channelValue, aiCalls] =
     await Promise.all([
       ordersByChannel(outlet.id, today, now),
       ordersByChannel(outlet.id, monthStart, now),
@@ -47,13 +47,14 @@ export default async function TodayPage() {
       topCustomers(outlet.id, weekStart, now),
       topDishes(outlet.id, monthStart, now),
       channelOrderValue(outlet.id, monthStart, now),
+      // Ideation §10: answered telephone calls only; browser demo calls are excluded in the repo.
+      countAllowanceCalls(outlet.id, monthStart, now),
     ])
 
   const shareMonth = share(deliveredMonth, extMonth)
   const shareLast = share(deliveredLast, extLast)
   const ordersToday = byChannelToday.reduce((n, r) => n + r.orders, 0)
   const ordersMonth = byChannelMonth.reduce((n, r) => n + r.orders, 0)
-  const aiCalls = 0 // M2 fills this from the call table
   const invoice = estimateInvoice({ aiCalls, channelValuePaise: channelValue })
 
   return (
@@ -79,7 +80,7 @@ export default async function TodayPage() {
         <div className={styles.stat}>
           <span className={styles.statLabel}>AI calls used</span>
           <span className={`${styles.statValue} num`}>{aiCalls} / {CALL_ALLOWANCE}</span>
-          <span className={styles.statNote}>The call assistant arrives with M2</span>
+          <span className={styles.statNote}>Telephone calls the assistant answered this month; browser demo calls are not counted</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Estimated invoice to date</span>

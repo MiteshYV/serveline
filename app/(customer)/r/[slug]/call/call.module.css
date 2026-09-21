@@ -1,0 +1,113 @@
+/* The mic page (M2 design "Surfaces"): one brand CTA, a transcript, and a "type instead" field
+   that is always present. Tokens only, comfort density, 16px gutters (design §5.1). Nothing here
+   animates (design §8: the customer surface stays still). */
+
+.call {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-16) var(--space-16) var(--space-32);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.lead {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* The honest limit and the device notes ("No Kannada voice on this device"): one line, secondary ink. */
+.limit {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* A scrolling box, so the controls below stay put as the conversation grows. */
+.transcript {
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  max-height: 50dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* One plate per line (design §5.2: plates, not pills). Body line-height, never a clamp, so
+   Indic matras are not clipped (design §4.2, §11.11). */
+.line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 88%;
+  padding: var(--space-12);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  box-shadow: var(--elev-1);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.ai {
+  align-self: flex-start;
+}
+
+/* The caller's lines sit on the brand wash; the speaker is also named in text (design §3.3). */
+.customer {
+  align-self: flex-end;
+  background: var(--brand-wash);
+}
+
+.who {
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+/* "Listening…" / "One moment…": reserved height so the controls do not jump between states. */
+.activity {
+  margin: 0;
+  min-height: var(--space-20);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+/* Type instead: the field grows, Send sits on its bottom edge (the code form's row on the menu). */
+.typeRow {
+  display: flex;
+  gap: var(--space-8);
+  align-items: flex-end;
+}
+
+.typeRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.endedTitle {
+  margin: 0;
+  font-size: var(--text-subtitle);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}

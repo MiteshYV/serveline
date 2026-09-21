@@ -58,7 +58,23 @@ export class LlmError extends Error {
   }
 }
 
-type Provider = 'gemini' | 'anthropic' | 'mock'
+type Provider = 'gemini' | 'anthropic' | 'mock' | 'failing'
+
+/**
+ * A test hook, and only that: `LLM_PRIMARY_PROVIDER=failing` (or SECONDARY) selects an adapter
+ * that always throws, so loop.test.ts can drive Build Spec §5.3's outage rule — two failures →
+ * the secondary provider, two more → transfer `vendor_error` (M2 design, acceptance 6) — without
+ * a network or an invalid key. It needs no key and is honoured in any VENDOR_MODE, like `mock`.
+ * Deliberately absent from .env.example: nothing outside a test should set it, and if something
+ * does, every call transfers on its first turn, which is loud enough to notice.
+ */
+export const failingLlmAdapter: LlmAdapter = {
+  provider: 'failing',
+  model: 'always-throws',
+  complete: async () => {
+    throw new LlmError('failing', 503, 'scripted failure (LLM_*_PROVIDER=failing)')
+  },
+}
 
 /**
  * `LLM_PRIMARY_PROVIDER` / `LLM_SECONDARY_PROVIDER` name the provider, `LLM_*_API_KEY` its key
@@ -77,6 +93,7 @@ export function llm(which: 'primary' | 'secondary'): LlmAdapter {
     throw new Error(`not configured: ${providerVar}`)
   }
   if (provider === 'mock') return mockLlmAdapter
+  if (provider === 'failing') return failingLlmAdapter
 
   const key = process.env[keyVar]
   if (!key) throw new Error(`not configured: ${keyVar}`)

@@ -81,6 +81,14 @@ export default async function MenuPage({ params, searchParams }: Props) {
         {' · '}{outlet.name}
       </p>
 
+      {ctx.kind === 'delivery' && (
+        // The mic surface (M2 design "Surfaces"). A voice order is delivery or pickup, so a seated
+        // diner is not offered it (design §11.7); ghost, because the brand fill is the cart's.
+        <div className={styles.toolbar}>
+          <Button href={`/r/${slug}/call`} variant="ghost" size="counter" block>{t('menu.callToOrder', lang)}</Button>
+        </div>
+      )}
+
       {code && (
         // Not an order state, so a neutral band (palette law, design §3.2) whether applied or refused.
         <Band tone="neutral" live={code.ok ? 'off' : 'polite'} className="mx-[var(--space-16)] mt-[var(--space-12)] rounded-[var(--radius-3)]">

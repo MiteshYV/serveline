@@ -36,7 +36,7 @@ export type PageContext = { kind: 'table'; tableNo: string } | { kind: 'delivery
  * and a call has no URL to be decided from. `code` is what `apply_code` accepted; it is resolved
  * here exactly as the card's is.
  */
-export type CallContext = { kind: 'call'; fulfilment: 'delivery' | 'pickup'; callId: string; code?: string }
+export type CallContext = { kind: 'call'; fulfilment: 'delivery' | 'pickup'; callId: string; code?: string; notes?: string }
 
 export type CodeOutcome =
   | { ok: true; percent: number; code: string; codeId: string; kind: 'win_back_card' | 'manual' }
@@ -141,6 +141,8 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     customerId: customer.id,
     addressId,
     callId: context.kind === 'call' ? context.callId : undefined,
+    // A parked handoff order carries its reason on the card (design "Handoff without a telephone").
+    notes: context.kind === 'call' ? context.notes : undefined,
     paymentMethod: input.paymentMethod,
     discountCodeId: codeOutcome?.codeId,
     cart,
