@@ -29,6 +29,15 @@ import type { Lang } from '../ui/i18n.ts'
 /** Decided from the URL at load and never asked (design §7.4): `?t=` is a table, anything else is delivery. */
 export type PageContext = { kind: 'table'; tableNo: string } | { kind: 'delivery'; code?: string }
 
+/**
+ * The voice assistant's `place_order` tool (M2 design "The thirteen tools"): channel `ai_call`,
+ * the order linked to its call, delivery or pickup. A separate type rather than a third member
+ * of `PageContext`, because the page narrows that union on `code` (app/(customer)/r/[slug]/lib.ts)
+ * and a call has no URL to be decided from. `code` is what `apply_code` accepted; it is resolved
+ * here exactly as the card's is.
+ */
+export type CallContext = { kind: 'call'; fulfilment: 'delivery' | 'pickup'; callId: string; code?: string }
+
 export type CodeOutcome =
   | { ok: true; percent: number; code: string; codeId: string; kind: 'win_back_card' | 'manual' }
   | { ok: false; reason: RedemptionRefusal | 'not_found'; code: string }
@@ -59,7 +68,7 @@ export type PlaceOrderInput = {
   outlet: Pick<typeof outlet.$inferSelect, 'id' | 'codEnabled'>
   customer: Pick<typeof customer.$inferSelect, 'id' | 'phone' | 'phoneHash'>
   lang: Lang
-  context: PageContext
+  context: PageContext | CallContext
   /** Ids and quantities only. The client never sends a price. */
   items: CartItemInput[]
   paymentMethod: 'upi_link' | 'cod' | 'pay_at_table'
@@ -95,12 +104,13 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
 
   // The context fixes the fulfilment, the channel and which payment methods exist (Build Spec §6).
   const table = context.kind === 'table'
+  const delivery = context.kind === 'delivery' || (context.kind === 'call' && context.fulfilment === 'delivery')
   if (table && input.paymentMethod !== 'pay_at_table') return { ok: false, reason: 'bad_payment_method' }
   if (!table && input.paymentMethod === 'pay_at_table') return { ok: false, reason: 'bad_payment_method' }
   if (input.paymentMethod === 'cod' && !outlet.codEnabled) return { ok: false, reason: 'cod_disabled' }
 
   let addressId: string | undefined
-  if (!table) {
+  if (delivery) {
     // Ownership check: the id came from the URL. An address of another customer is "no address".
     const addresses = await listAddresses(customer.id, restaurant.id)
     addressId = addresses.find((a) => a.id === input.addressId)?.id
@@ -121,15 +131,16 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     throw error
   }
 
-  const channel = table ? 'page_table' : 'page_delivery'
+  const channel = context.kind === 'call' ? 'ai_call' : table ? 'page_table' : 'page_delivery'
   const order = await createOrder({
     restaurantId: restaurant.id,
     outletId: outlet.id,
     channel,
-    fulfilment: table ? 'dine_in' : 'delivery',
+    fulfilment: context.kind === 'call' ? context.fulfilment : table ? 'dine_in' : 'delivery',
     tableNo: table ? context.tableNo : undefined,
     customerId: customer.id,
     addressId,
+    callId: context.kind === 'call' ? context.callId : undefined,
     paymentMethod: input.paymentMethod,
     discountCodeId: codeOutcome?.codeId,
     cart,
@@ -158,7 +169,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   await upsertCustomerRestaurant({
     customerId: customer.id,
     restaurantId: restaurant.id,
-    source: codeOutcome ? 'win_back' : table ? 'table' : 'page',
+    source: codeOutcome ? 'win_back' : context.kind === 'call' ? 'organic_call' : table ? 'table' : 'page',
     firstChannel: channel,
     consentId: consent?.id,
     ...(hasValidConsent(consentView, 'order_history')

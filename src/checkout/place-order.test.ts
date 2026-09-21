@@ -186,4 +186,31 @@ describe('placeOrder', () => {
     })
     assert.deepEqual(noAddress, { ok: false, reason: 'address_required' })
   })
+
+  it('call context: a pickup order on channel ai_call, linked to its call, with no address', async () => {
+    const { customer } = await newCustomer('+919900000105')
+    const call = await repos.createCall({ outletId: outlet.id, transport: 'browser', customerId: customer.id })
+    const items = [{ itemId: itemByName('Idli Vada').id, optionIds: [], qty: 1 }]
+    const result = await placeOrder({
+      ...base, customer,
+      context: { kind: 'call', fulfilment: 'pickup', callId: call.id },
+      items, paymentMethod: 'cod',
+    })
+    assert.ok(result.ok, JSON.stringify(result))
+    const order = (await repos.getOrder(result.orderId))!
+    assert.equal(order.channel, 'ai_call')
+    assert.equal(order.fulfilment, 'pickup')
+    assert.equal(order.callId, call.id)
+    assert.equal(order.addressId, null)
+    assert.equal(order.addressStatus, 'na')
+    assert.equal(order.tableNo, null)
+    assert.equal(order.status, 'confirmed') // COD confirms at once, as on the page
+    assert.equal((await repos.getCustomerRestaurant(customer.id, restaurant.id))!.source, 'organic_call')
+
+    // Delivery by voice still needs a saved address the caller owns.
+    const noAddress = await placeOrder({
+      ...base, customer, context: { kind: 'call', fulfilment: 'delivery', callId: call.id }, items, paymentMethod: 'cod',
+    })
+    assert.deepEqual(noAddress, { ok: false, reason: 'address_required' })
+  })
 })

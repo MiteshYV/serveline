@@ -1,0 +1,164 @@
+{
+  "$comment": "The thirteen tools the call assistant can use (Build Spec §5.5, verbatim). Descriptions are read by the model, so they say when to call the tool in plain English. `parameters` is JSON Schema; src/voice/tools.ts validates every call against it (tools.test.ts asserts the two agree), the LLM adapters send it to the model as-is, and the Python transport reads the same file (ADR 0004). Every id a tool takes must have come from an earlier tool result in the same call: the model never supplies a price or a name.",
+  "version": 1,
+  "tools": [
+    {
+      "name": "search_menu",
+      "description": "Call this whenever the caller names or describes a dish, and before adding anything to the cart: it finds matching items on this outlet's menu and returns their ids, prices, sizes and options.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "minLength": 1, "maxLength": 120, "description": "The dish as the caller said it, for example 'masala dosa' or 'chicken biryani'." },
+          "language": { "type": "string", "enum": ["hi", "en", "kn"], "description": "The language the caller is speaking right now." }
+        },
+        "required": ["query", "language"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "add_to_cart",
+      "description": "Call this to add an item the caller wants, using the item_id (and any variant_id or option_ids) exactly as search_menu returned them earlier in this call.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "item_id": { "type": "string", "minLength": 1, "description": "An id from a search_menu result in this call." },
+          "variant_id": { "type": "string", "minLength": 1, "description": "The size or portion the caller chose, when the item has variants." },
+          "option_ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Ids of the options the caller chose; a required option group must have one." },
+          "qty": { "type": "integer", "minimum": 1, "maximum": 99, "description": "How many the caller wants." }
+        },
+        "required": ["item_id", "qty"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "remove_from_cart",
+      "description": "Call this when the caller wants an item taken out of the order, using the lineId from the latest cart result.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "line_id": { "type": "string", "pattern": "^line-\\d+$", "description": "The lineId shown in the last add_to_cart or get_cart result." }
+        },
+        "required": ["line_id"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_cart",
+      "description": "Call this to see the current items, quantities and total before reading the order back to the caller.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "apply_code",
+      "description": "Call this when the caller mentions a discount or offer code, such as one printed on a card that came with an earlier order.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 32, "description": "The code as the caller read it out, letters and digits only." }
+        },
+        "required": ["code"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "check_serviceability",
+      "description": "Call this before taking a delivery address, to confirm the outlet delivers to the caller's area or pincode.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "area": { "type": "string", "minLength": 1, "maxLength": 80, "description": "The locality the caller named, for example 'Koramangala'." },
+          "pincode": { "type": "string", "minLength": 6, "maxLength": 7, "description": "The six-digit pincode, if the caller gave one." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "use_saved_address",
+      "description": "Call this when a returning caller confirms one of their saved addresses by its label, using the address id from their profile.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "address_id": { "type": "string", "minLength": 1, "description": "The id of a saved address listed in the caller's profile." }
+        },
+        "required": ["address_id"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "capture_rough_address",
+      "description": "Call this when a new caller gives a delivery area and landmark by voice; it saves that rough address so the order can go ahead while the exact address is confirmed later.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "minLength": 3, "maxLength": 300, "description": "The area and landmark in the caller's words, for example 'Koramangala 5th block, near Sony signal'." }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "send_sms",
+      "description": "Call this with kind 'page_link' to text the caller a link to the online menu and ordering page, for example when they ask a second question about the menu; payment links are sent by place_order, not by this tool.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["page_link", "payment_link"], "description": "Which message to send." }
+        },
+        "required": ["kind"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "place_order",
+      "description": "Call this only after the caller has heard the full read-back — items with quantities, the total, delivery or pickup, the address, the payment method — and has said yes.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fulfilment": { "type": "string", "enum": ["delivery", "pickup"], "description": "Delivery to the caller's address, or pickup from the outlet." },
+          "payment_method": { "type": "string", "enum": ["upi_link", "cod"], "description": "'upi_link' texts the caller a UPI payment link; 'cod' is cash on delivery or at the counter." }
+        },
+        "required": ["fulfilment", "payment_method"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "answer_enquiry",
+      "description": "Call this to get the outlet's opening hours, address, delivery area or where to see the full menu, so the answer comes from the restaurant's own settings rather than from memory.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["hours", "address", "delivery", "menu"], "description": "What the caller asked about." }
+        },
+        "required": ["kind"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "transfer_to_human",
+      "description": "Call this when the caller asks for a person, or when you cannot complete what they need; the restaurant takes over and anything already in the cart is kept for them.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 1, "maxLength": 200, "description": "A few words in English on why, for the restaurant's records." }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "end_call",
+      "description": "Call this once the conversation is finished — after your closing words, or when the caller says goodbye or has nothing more to order.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 1, "maxLength": 200, "description": "A few words in English on how the call ended, for example 'order placed' or 'caller declined'." }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

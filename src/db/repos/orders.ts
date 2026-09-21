@@ -33,6 +33,8 @@ export type CreateOrderInput = {
   addressId?: string
   paymentMethod: OrderRow['paymentMethod']
   discountCodeId?: string
+  /** The AI call that placed it (Build Spec §4, M2 design "The thirteen tools"). */
+  callId?: string
   notes?: string
   /** Already priced by core. Copied verbatim into `order` and `order_item`. */
   cart: Cart
@@ -78,6 +80,7 @@ export async function createOrder(input: CreateOrderInput, actor: Actor): Promis
           // page, so it is confirmed by construction. M2's voice_rough addresses land as
           // `pending` and the address link confirms them (Build Spec §6).
           addressStatus: input.fulfilment !== 'delivery' ? 'na' : input.addressId ? 'confirmed' : 'pending',
+          callId: input.callId ?? null,
           notes: input.notes ?? null,
         })
         .returning(),
