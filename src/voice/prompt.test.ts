@@ -42,7 +42,7 @@ const priyaRecord = {
 const priya: ProfileSummary = priyaRecord
 
 describe('buildSystemPrompt', () => {
-  const prompt = buildSystemPrompt({ restaurant, outlet, profile: priya, lang: 'kn', now: mondayMorning, transport: 'browser' })
+  const prompt = buildSystemPrompt({ restaurant, outlet, profile: priya, lang: 'kn', now: mondayMorning, transport: 'browser', consented: true })
 
   it('carries no phone number and no address line (Build Spec §10)', () => {
     assert.doesNotMatch(prompt, /\d{10}/)
@@ -83,7 +83,7 @@ describe('buildSystemPrompt', () => {
   })
 
   it('asks about allergies once for a caller with none on record', () => {
-    const fresh = buildSystemPrompt({ restaurant, outlet, profile: null, lang: 'hi', now: mondayMorning, transport: 'exotel' })
+    const fresh = buildSystemPrompt({ restaurant, outlet, profile: null, lang: 'hi', now: mondayMorning, transport: 'exotel', consented: true })
     assert.ok(fresh.includes('Caller: new'))
     assert.ok(fresh.includes('Ask once, early in the order, whether the caller has any allergies'))
     assert.ok(fresh.endsWith('\nLanguage: hi'))
@@ -97,7 +97,7 @@ describe('buildSystemPrompt', () => {
     assert.ok(prompt.includes('Cash on delivery: on'))
 
     // Sunday 20 Sept 2026 20:00 IST: an empty list means closed.
-    const sunday = buildSystemPrompt({ restaurant, outlet, profile: null, lang: 'en', now: new Date('2026-09-20T14:30:00Z'), transport: 'browser' })
+    const sunday = buildSystemPrompt({ restaurant, outlet, profile: null, lang: 'en', now: new Date('2026-09-20T14:30:00Z'), transport: 'browser', consented: true })
     assert.ok(sunday.includes('Hours today: closed today'))
 
     // Deepavali, and an outlet with no hours set and no COD.
@@ -108,10 +108,11 @@ describe('buildSystemPrompt', () => {
       lang: 'en',
       now: new Date('2026-11-08T05:00:00Z'),
       transport: 'browser',
+      consented: true,
     })
     assert.ok(holiday.includes('Hours today: closed today (holiday)'))
     assert.ok(holiday.includes('Cash on delivery: off'))
-    const noHours = buildSystemPrompt({ restaurant, outlet: { ...outlet, hours: 'garbage' }, profile: null, lang: 'en', now: mondayMorning, transport: 'browser' })
+    const noHours = buildSystemPrompt({ restaurant, outlet: { ...outlet, hours: 'garbage' }, profile: null, lang: 'en', now: mondayMorning, transport: 'browser', consented: true })
     assert.ok(noHours.includes('Hours today: not on record'))
   })
 

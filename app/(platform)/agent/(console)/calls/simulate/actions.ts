@@ -21,7 +21,7 @@ const end = z.object({ callId: z.uuid() })
 
 export type StartResult = { ok: true; callId: string; greeting: string; lang: Lang } | { ok: false; error: string }
 export type TurnReply =
-  | { ok: true; reply: string; toolCalls: ToolCallRecord[]; ended: boolean; outcome?: string; orderId?: string }
+  | { ok: true; reply: string; lang: Lang; toolCalls: ToolCallRecord[]; ended: boolean; outcome?: string; orderId?: string }
   | { ok: false; error: string; ended: boolean }
 
 // Calls this console started. A platform session may type into a call it opened here and into

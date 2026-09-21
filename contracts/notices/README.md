@@ -5,7 +5,8 @@ Build Spec §10; Ideation §15 (DPDP Act 2023 and the DPDP Rules 2025).
 
 ```
 contracts/notices/
-  v1/en.md   v1/hi.md   v1/kn.md
+  v1/en.md          v1/hi.md          v1/kn.md          the notice, read
+  v1/spoken-en.md   v1/spoken-hi.md   v1/spoken-kn.md   the same notice, spoken
 ```
 
 One directory per notice version, one file per language — `hi`, `en`, `kn`, the three the MVP
@@ -15,6 +16,28 @@ supports (Ideation §11). The directory name is the exact value stored in
 Markdown, not TypeScript, because the Python voice service reads these same files at M2 and speaks
 the notice aloud before recording (ADR 0001). Anything only TypeScript can read does not belong
 here.
+
+## Renderings: read and spoken
+
+A notice version may have more than one rendering. `v1/en.md` is what a customer reads on the
+ordering page. `v1/spoken-en.md` is what the call assistant says out loud before it takes an order
+from someone it has not met (Build Spec §10: "Voice consent is the spoken yes after the notice").
+Both are `v1`, because both describe the same handling of the same data — a `consent_record`
+pointing at `v1` is honest whichever one the customer got.
+
+The spoken rendering is shorter, and that is the point: nobody listens to two hundred and fifty
+words on the phone, and a notice nobody listens to is not consent. It says who keeps what, why,
+that it goes nowhere else, that it can be deleted, and where the full text is. It covers
+`order_fulfilment` and `order_history` only — fewer purposes than the read notice, so a call
+consent grants less. `call_recording` belongs to the telephone transport, whose greeting carries
+its own recording notice; the browser transport records nothing.
+
+**A rendering is immutable exactly like the notice it renders.** Shortening it further, or adding
+a purpose to it, is a new version for both files.
+
+**Counsel has not reviewed either rendering.** Ideation §15 already flags the consent approach as
+a legal reading rather than an opinion; the spoken rendering is inside that gap, not beside it.
+The Hindi and Kannada renderings are interim translations (ADR 0002 §4).
 
 ## Never edit a notice in place
 

@@ -215,10 +215,13 @@ describe('addresses', () => {
     assert.deepEqual(await runTool('capture_rough_address', { text }, s, anonymous), { ok: false, reason: 'customer_required' })
 
     const saved = data<{ addressId: string; label: string }>(await runTool('capture_rough_address', { text }, s, asAnita))
-    assert.equal(saved.label, text)
+    // Build Spec §10: the label reaches the prompt and the tool result, so it is never the spoken
+    // line — that goes to line1, which nothing reads back to the model.
+    assert.equal(saved.label, 'Spoken address')
+    assert.notEqual(saved.label, text)
     assert.equal(s.addressId, saved.addressId)
     const row = one(await db.select().from(schema.customerAddress).where(eq(schema.customerAddress.id, saved.addressId)))
-    assert.deepEqual([row.source, row.isConfirmed, row.customerId, row.label], ['voice_rough', false, anita.id, text])
+    assert.deepEqual([row.source, row.isConfirmed, row.customerId, row.label, row.line1], ['voice_rough', false, anita.id, 'Spoken address', text])
   })
 })
 

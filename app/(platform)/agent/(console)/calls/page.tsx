@@ -50,7 +50,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
         meta={
           <>
             Newest first, <span className="num">{PAGE}</span> a page. Browser calls are the simulator and the mic page — demos, never
-            counted toward the allowance (Ideation §10); only Exotel calls are.
+            counted toward the allowance; only telephone calls are.
           </>
         }
         actions={<Button href="/agent/calls/simulate" size="dense">Simulate a call</Button>}
@@ -96,7 +96,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
               <tr key={r.id}>
                 <td>{r.restaurantName} <span className={c.muted}>· {r.outletName}</span></td>
                 <td className={`${c.nowrap} num`}>
-                  <a href={`/agent/calls/${r.id}`}>{fmtIst(r.startedAt)}</a> <span className={c.muted}>{shortId(r.id)}</span>
+                  <a href={`/agent/calls/${r.id}`} style={{ display: 'inline-block', minHeight: 'var(--touch-dense)', lineHeight: 'var(--touch-dense)' }}>{fmtIst(r.startedAt)}</a> <span className={c.muted}>{shortId(r.id)}</span>
                 </td>
                 <td><Tag tone={r.transport === 'exotel' ? 'strong' : 'default'}>{capitalise(r.transport)}</Tag></td>
                 <td>{r.languageDetected ?? '—'}</td>

@@ -517,12 +517,12 @@ export function CallClient({ slug, restaurant, lang }: Props) {
         <Button variant="brand" size="counter" block disabled>{s.connecting}</Button>
       )}
 
-      {note && <p className={styles.limit} role="status">{note}</p>}
+      {note && <p className={styles.limit}>{note}</p>}
 
       {lines.length > 0 && (
         // Every line carries its language for the screen reader (design §9); the box is polite,
         // so a reply is announced as it is spoken.
-        <ol ref={list} className={styles.transcript} aria-live="polite">
+        <ol ref={list} className={styles.transcript} role="list">
           {lines.map((l) => (
             <li key={l.id} lang={l.lang} className={`${styles.line} ${l.speaker === 'ai' ? styles.ai : styles.customer}`}>
               <span className={styles.who}>{l.speaker === 'ai' ? restaurant : s.you}</span>

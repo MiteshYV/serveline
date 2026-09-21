@@ -12,7 +12,7 @@ import { endSimulatedCall, sendSimulatedTurn, startSimulatedCall } from './actio
 
 type Outlet = { id: string; restaurant: string; name: string }
 type Caller = { id: string; firstName: string | null; phoneTail: string; preferredLanguage: Lang | null }
-type Line = { who: 'ai' | 'customer'; text: string; toolCalls?: ToolCallRecord[] }
+type Line = { who: 'ai' | 'customer'; text: string; lang: Lang; toolCalls?: ToolCallRecord[] }
 type Live = { callId: string; lang: Lang; lines: Line[]; ended: boolean; outcome?: string; orderId?: string }
 
 const LANGS: Lang[] = ['hi', 'en', 'kn']
@@ -48,7 +48,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
     const res = await startSimulatedCall({ outletId: fd.get('outletId'), customerId: customerId || null, lang: fd.get('lang') })
     setPending(false)
     if (!res.ok) return setError(res.error)
-    setLive({ callId: res.callId, lang: res.lang, lines: [{ who: 'ai', text: res.greeting }], ended: false })
+    setLive({ callId: res.callId, lang: res.lang, lines: [{ who: 'ai', text: res.greeting, lang: res.lang }], ended: false })
   }
 
   async function onSend(e: FormEvent<HTMLFormElement>) {
@@ -59,7 +59,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
     setPending(true)
     setError(null)
     setDraft('')
-    setLive((l) => l && { ...l, lines: [...l.lines, { who: 'customer', text }] })
+    setLive((l) => l && { ...l, lines: [...l.lines, { who: 'customer', text, lang }] })
     const res = await sendSimulatedTurn({ callId, text, lang })
     setPending(false)
     if (!res.ok) {
@@ -69,7 +69,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
     }
     setLive((l) => l && {
       ...l,
-      lines: [...l.lines, { who: 'ai', text: res.reply, toolCalls: res.toolCalls }],
+      lines: [...l.lines, { who: 'ai', text: res.reply, lang: res.lang ?? l.lang, toolCalls: res.toolCalls }],
       ended: res.ended,
       ...(res.outcome ? { outcome: res.outcome } : {}),
       ...(res.orderId ? { orderId: res.orderId } : {}),
@@ -101,7 +101,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
             id="customerId"
             label="Caller"
             className="w-[280px]"
-            hint="A new caller has no number and no profile: the assistant takes the order, and place_order refuses (customer_required) until a transport carries the number (M2b)."
+            hint="A new caller has no phone number, so the assistant can take the order but cannot place it. Pick a customer to place one."
           >
             {(p) => (
               <select {...p} name="customerId" className={c.select}>
@@ -152,7 +152,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
           </>
         }
       >
-        <ol className="m-0 p-0 list-none grid">
+        <ol role="list" className="m-0 p-0 list-none grid">
           {live.lines.map((line, i) => (
             <li key={i} className="grid grid-cols-[max-content_1fr] gap-[var(--space-12)] py-[var(--space-8)] border-b border-[color:var(--border-separator)] last:border-b-0">
               <Tag tone={line.who === 'ai' ? 'strong' : 'default'}>{line.who === 'ai' ? 'AI' : 'Caller'}</Tag>

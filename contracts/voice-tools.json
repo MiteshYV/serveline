@@ -1,5 +1,5 @@
 {
-  "$comment": "The thirteen tools the call assistant can use (Build Spec §5.5, verbatim). Descriptions are read by the model, so they say when to call the tool in plain English. `parameters` is JSON Schema; src/voice/tools.ts validates every call against it (tools.test.ts asserts the two agree), the LLM adapters send it to the model as-is, and the Python transport reads the same file (ADR 0004). Every id a tool takes must have come from an earlier tool result in the same call: the model never supplies a price or a name.",
+  "$comment": "The thirteen tools the call assistant can use (Build Spec \u00a75.5, verbatim). Descriptions are read by the model, so they say when to call the tool in plain English. `parameters` is JSON Schema; src/voice/tools.ts validates every call against it (tools.test.ts asserts the two agree), the LLM adapters send it to the model as-is, and the Python transport reads the same file (ADR 0004). Every id a tool takes must have come from an earlier tool result in the same call: the model never supplies a price or a name.",
   "version": 1,
   "tools": [
     {
@@ -8,10 +8,26 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "query": { "type": "string", "minLength": 1, "maxLength": 120, "description": "The dish as the caller said it, for example 'masala dosa' or 'chicken biryani'." },
-          "language": { "type": "string", "enum": ["hi", "en", "kn"], "description": "The language the caller is speaking right now." }
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "The dish as the caller said it, for example 'masala dosa' or 'chicken biryani'."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "hi",
+              "en",
+              "kn"
+            ],
+            "description": "The language the caller is speaking right now."
+          }
         },
-        "required": ["query", "language"],
+        "required": [
+          "query",
+          "language"
+        ],
         "additionalProperties": false
       }
     },
@@ -21,12 +37,35 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "item_id": { "type": "string", "minLength": 1, "description": "An id from a search_menu result in this call." },
-          "variant_id": { "type": "string", "minLength": 1, "description": "The size or portion the caller chose, when the item has variants." },
-          "option_ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Ids of the options the caller chose; a required option group must have one." },
-          "qty": { "type": "integer", "minimum": 1, "maximum": 99, "description": "How many the caller wants." }
+          "item_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An id from a search_menu result in this call."
+          },
+          "variant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The size or portion the caller chose, when the item has variants."
+          },
+          "option_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Ids of the options the caller chose; a required option group must have one."
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "How many the caller wants."
+          }
         },
-        "required": ["item_id", "qty"],
+        "required": [
+          "item_id",
+          "qty"
+        ],
         "additionalProperties": false
       }
     },
@@ -36,9 +75,15 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "line_id": { "type": "string", "pattern": "^line-\\d+$", "description": "The lineId shown in the last add_to_cart or get_cart result." }
+          "line_id": {
+            "type": "string",
+            "pattern": "^line-\\d+$",
+            "description": "The lineId shown in the last add_to_cart or get_cart result."
+          }
         },
-        "required": ["line_id"],
+        "required": [
+          "line_id"
+        ],
         "additionalProperties": false
       }
     },
@@ -57,9 +102,16 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "code": { "type": "string", "minLength": 1, "maxLength": 32, "description": "The code as the caller read it out, letters and digits only." }
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "The code as the caller read it out, letters and digits only."
+          }
         },
-        "required": ["code"],
+        "required": [
+          "code"
+        ],
         "additionalProperties": false
       }
     },
@@ -69,8 +121,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "area": { "type": "string", "minLength": 1, "maxLength": 80, "description": "The locality the caller named, for example 'Koramangala'." },
-          "pincode": { "type": "string", "minLength": 6, "maxLength": 7, "description": "The six-digit pincode, if the caller gave one." }
+          "area": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "The locality the caller named, for example 'Koramangala'."
+          },
+          "pincode": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 7,
+            "description": "The six-digit pincode, if the caller gave one."
+          }
         },
         "additionalProperties": false
       }
@@ -81,9 +143,15 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "address_id": { "type": "string", "minLength": 1, "description": "The id of a saved address listed in the caller's profile." }
+          "address_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id of a saved address listed in the caller's profile."
+          }
         },
-        "required": ["address_id"],
+        "required": [
+          "address_id"
+        ],
         "additionalProperties": false
       }
     },
@@ -93,9 +161,16 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "text": { "type": "string", "minLength": 3, "maxLength": 300, "description": "The area and landmark in the caller's words, for example 'Koramangala 5th block, near Sony signal'." }
+          "text": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300,
+            "description": "The area and landmark in the caller's words, for example 'Koramangala 5th block, near Sony signal'."
+          }
         },
-        "required": ["text"],
+        "required": [
+          "text"
+        ],
         "additionalProperties": false
       }
     },
@@ -105,22 +180,65 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "kind": { "type": "string", "enum": ["page_link", "payment_link"], "description": "Which message to send." }
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page_link",
+              "payment_link"
+            ],
+            "description": "Which message to send."
+          }
         },
-        "required": ["kind"],
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "record_consent",
+      "description": "Call this only after you have read the consent notice out loud, word for word, and the caller has answered. Pass agreed true for a yes and false for a no. Until a caller has agreed, you cannot place their order.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "agreed": {
+            "type": "boolean",
+            "description": "True if the caller said yes to the notice you just read."
+          }
+        },
+        "required": [
+          "agreed"
+        ],
         "additionalProperties": false
       }
     },
     {
       "name": "place_order",
-      "description": "Call this only after the caller has heard the full read-back — items with quantities, the total, delivery or pickup, the address, the payment method — and has said yes.",
+      "description": "Call this only after the caller has heard the full read-back \u2014 items with quantities, the total, delivery or pickup, the address, the payment method \u2014 and has said yes.",
       "parameters": {
         "type": "object",
         "properties": {
-          "fulfilment": { "type": "string", "enum": ["delivery", "pickup"], "description": "Delivery to the caller's address, or pickup from the outlet." },
-          "payment_method": { "type": "string", "enum": ["upi_link", "cod"], "description": "'upi_link' texts the caller a UPI payment link; 'cod' is cash on delivery or at the counter." }
+          "fulfilment": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ],
+            "description": "Delivery to the caller's address, or pickup from the outlet."
+          },
+          "payment_method": {
+            "type": "string",
+            "enum": [
+              "upi_link",
+              "cod"
+            ],
+            "description": "'upi_link' texts the caller a UPI payment link; 'cod' is cash on delivery or at the counter."
+          }
         },
-        "required": ["fulfilment", "payment_method"],
+        "required": [
+          "fulfilment",
+          "payment_method"
+        ],
         "additionalProperties": false
       }
     },
@@ -130,9 +248,20 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "kind": { "type": "string", "enum": ["hours", "address", "delivery", "menu"], "description": "What the caller asked about." }
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hours",
+              "address",
+              "delivery",
+              "menu"
+            ],
+            "description": "What the caller asked about."
+          }
         },
-        "required": ["kind"],
+        "required": [
+          "kind"
+        ],
         "additionalProperties": false
       }
     },
@@ -142,21 +271,35 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "reason": { "type": "string", "minLength": 1, "maxLength": 200, "description": "A few words in English on why, for the restaurant's records." }
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "A few words in English on why, for the restaurant's records."
+          }
         },
-        "required": ["reason"],
+        "required": [
+          "reason"
+        ],
         "additionalProperties": false
       }
     },
     {
       "name": "end_call",
-      "description": "Call this once the conversation is finished — after your closing words, or when the caller says goodbye or has nothing more to order.",
+      "description": "Call this once the conversation is finished \u2014 after your closing words, or when the caller says goodbye or has nothing more to order.",
       "parameters": {
         "type": "object",
         "properties": {
-          "reason": { "type": "string", "minLength": 1, "maxLength": 200, "description": "A few words in English on how the call ended, for example 'order placed' or 'caller declined'." }
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "A few words in English on how the call ended, for example 'order placed' or 'caller declined'."
+          }
         },
-        "required": ["reason"],
+        "required": [
+          "reason"
+        ],
         "additionalProperties": false
       }
     }

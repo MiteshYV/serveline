@@ -52,7 +52,7 @@
   gap: var(--space-2);
   max-width: 88%;
   padding: var(--space-12);
-  border-radius: var(--radius-3);
+  border-radius: var(--radius-4);
   background: var(--bg-card);
   box-shadow: var(--elev-1);
   font-size: var(--text-body);
@@ -65,10 +65,10 @@
   align-self: flex-start;
 }
 
-/* The caller's lines sit on the brand wash; the speaker is also named in text (design §3.3). */
+/* The caller's lines sit on the sunken ground — brand colour is not permitted here (design §3.5); the speaker is also named in text (§3.3). */
 .customer {
   align-self: flex-end;
-  background: var(--brand-wash);
+  background: var(--bg-sunken);
 }
 
 .who {

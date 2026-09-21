@@ -57,8 +57,9 @@ price because it never supplies either — it supplies ids and quantities.
 ### The thirteen tools (Build Spec §5.5, verbatim)
 
 `search_menu`, `add_to_cart`, `remove_from_cart`, `get_cart`, `apply_code`, `check_serviceability`,
-`use_saved_address`, `capture_rough_address`, `send_sms`, `place_order`, `answer_enquiry`,
-`transfer_to_human`, `end_call`. JSON Schemas in `contracts/voice-tools.json` — language-neutral, so
+`use_saved_address`, `capture_rough_address`, `send_sms`, `record_consent`, `place_order`,
+`answer_enquiry`, `transfer_to_human`, `end_call` — fourteen: §5.5's thirteen plus
+`record_consent`, which §10's spoken consent needs and §5.5 does not provide (ADR 0005). JSON Schemas in `contracts/voice-tools.json` — language-neutral, so
 the Python transport and the tests read the same file.
 
 `place_order` calls `src/checkout/place-order.ts`'s `placeOrder` with a new `call` context (channel
@@ -164,7 +165,8 @@ the expected tool calls; run against the mock now and against the real model whe
 ## Acceptance — done when
 
 1. Text simulator: a three-item Hindi order with a variant is placed; it is on the dashboard within
-   5 s; the payment link is in the mock SMS inbox.
+   5 s; the payment link is in the mock SMS inbox. A caller with no consent hears the spoken
+   notice first and the order follows their yes (ADR 0005).
 2. "I want to talk to someone" ends the call with a handoff and pins a `needs_attention` order.
 3. Mic surface: a spoken English order completes end to end in Chrome.
 4. A returning customer (seeded, with `usual_order`) completes "same as last time" in ≤ 3 turns.

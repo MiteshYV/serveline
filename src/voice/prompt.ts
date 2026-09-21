@@ -19,6 +19,7 @@ import { z } from 'zod'
 import { formatISTDate, formatISTTime, istDate } from '../core/calendar.ts'
 import { formatINR, paise } from '../core/money.ts'
 import type { Lang } from '../ui/i18n.ts'
+import { spokenNotice } from './notice.ts'
 
 export type Transport = 'browser' | 'exotel'
 
@@ -29,7 +30,8 @@ export type Transport = 'browser' | 'exotel'
 export type ProfileSummary = {
   firstName: string | null
   /** Names and quantities for the greeting; the ids stay in the loop. Null when there is none. */
-  usualOrder: { name: string; qty: number }[] | null
+  /** Names for the greeting; the ids let add_to_cart replay the exact variant and options. */
+  usualOrder: { name: string; qty: number; itemId?: string; variantId?: string; optionIds?: string[] }[] | null
   /**
    * Not in the shared contract's first draft: `greetingFor` must quote the total (Build Spec
    * §5.2 "with the item names and total"), and a stored total would go stale the day the menu is
@@ -79,8 +81,12 @@ export function buildSystemPrompt(input: {
   lang: Lang
   now: Date
   transport: Transport
+  /** Live `order_fulfilment` consent. Without it the notice below must be read before any order. */
+  consented: boolean
+  /** No identity at all — the transport carries no number, so no order can be placed (M2b). */
+  anonymous?: boolean
 }): string {
-  const { restaurant, outlet, profile, lang, now, transport } = input
+  const { restaurant, outlet, profile, lang, now, transport, consented, anonymous } = input
 
   const persona = [
     `You are the phone assistant for ${restaurant.name}. You take orders and answer questions on the`,
@@ -111,7 +117,20 @@ export function buildSystemPrompt(input: {
     '- Payment: place_order with payment_method upi_link sends the payment link by SMS itself; cod only when the card below says cash on delivery is on.',
     '- Hours, address, delivery area or where to see the menu: answer_enquiry, in one turn. A second enquiry: offer the ordering page by SMS (send_sms page_link) and end the call.',
     '- Hand off with transfer_to_human when the caller asks for a person, is upset, or you cannot resolve something in two attempts. When the order is placed or the caller is done, say goodbye and call end_call.',
+    ...(anonymous
+      ? ['- This call carries no phone number, so you cannot place an order. Take the caller through the menu if they want, then offer the ordering page by SMS is not possible either — say the restaurant will need to call them back, and hand off.']
+      : consented
+        ? []
+        : [
+            '- This caller has not yet agreed to how their details are used, so place_order will refuse. Before you place anything — after the read-back, or earlier if it fits — read the notice below out loud, word for word, in the caller\'s language, then call record_consent with their answer.',
+            '- If they say no: call record_consent with agreed false, tell them you cannot take the order by phone without it, and offer the ordering page by SMS with send_sms page_link. Do not ask twice.',
+          ]),
   ].join('\n')
+
+  // Build Spec §10: the spoken rendering of the notice in force, read before a first order.
+  const noticeBlock = consented || anonymous
+    ? ''
+    : `\n\nConsent notice — read this out loud, word for word, before placing a first order:\n"${spokenNotice(lang, restaurant.name)}"`
 
   const outletCard = [
     'Outlet:',
@@ -131,7 +150,8 @@ export function buildSystemPrompt(input: {
       profile.usualOrder && profile.usualOrder.length > 0
         ? `- Usual order: ${profile.usualOrder.map((l) => `${l.name} × ${l.qty}`).join(', ')}`
           + (profile.usualOrderTotalPaise !== null
-            ? `; ${rupees(profile.usualOrderTotalPaise)} at today's prices. The greeting offered it as "same as last time?"; on a yes, search_menu and add_to_cart each item, then go straight to delivery or pickup.`
+            ? `; ${rupees(profile.usualOrderTotalPaise)} at today's prices. The greeting offered it as "same as last time?"; on a yes, call add_to_cart once per line below with exactly these ids (no search needed), then go straight to delivery or pickup.`
+              + `\n- Usual order ids: ${JSON.stringify(profile.usualOrder.filter((l) => l.itemId).map((l) => ({ item_id: l.itemId, ...(l.variantId ? { variant_id: l.variantId } : {}), option_ids: l.optionIds ?? [], qty: l.qty })))}`
             : '; one item is no longer on the menu, so do not offer it as-is.')
         : '- Usual order: none',
       profile.addressLabels.length > 0
@@ -155,7 +175,7 @@ export function buildSystemPrompt(input: {
   return [
     persona,
     languages,
-    policies,
+    policies + noticeBlock,
     outletCard,
     profileSummary,
     tools,

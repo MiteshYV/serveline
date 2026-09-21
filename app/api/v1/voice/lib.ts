@@ -38,7 +38,11 @@ export async function liveCall(id: string, caller: Caller): Promise<Session | 40
   if (!UUID.test(id)) return 404
   const session = getVoiceSession(id)
   if (session && !session.ended) {
-    return caller.kind === 'service' || session.customerId === caller.customerId ? session : 404
+    // A service caller (the future transport) may not post into a customer's browser call.
+    // ponytail: no per-customer rate limit on session-init yet — add one before a real LLM key
+    // is set, since every init is a call row and a model call.
+    if (caller.kind === 'service') return session.transport === 'browser' && session.customerId ? 404 : session
+    return session.customerId === caller.customerId ? session : 404
   }
   const call = await getCall(id)
   if (!call || (caller.kind === 'customer' && call.customerId !== caller.customerId)) return 404

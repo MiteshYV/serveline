@@ -36,7 +36,12 @@ export type PageContext = { kind: 'table'; tableNo: string } | { kind: 'delivery
  * and a call has no URL to be decided from. `code` is what `apply_code` accepted; it is resolved
  * here exactly as the card's is.
  */
-export type CallContext = { kind: 'call'; fulfilment: 'delivery' | 'pickup'; callId: string; code?: string; notes?: string }
+/**
+ * `parked`: a handoff left this order for a person to finish (design "Handoff without a telephone").
+ * No payment link, no SMS, no usual-order refresh — Build Spec §5.2 refreshes the usual order only
+ * "if the order completes", and nobody is asked to pay for an order the counter may cancel.
+ */
+export type CallContext = { kind: 'call'; fulfilment: 'delivery' | 'pickup'; callId: string; code?: string; notes?: string; parked?: boolean }
 
 export type CodeOutcome =
   | { ok: true; percent: number; code: string; codeId: string; kind: 'win_back_card' | 'manual' }
@@ -168,13 +173,14 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   const consentView = consent
     ? { noticeVersion: consent.noticeVersion, purposes: consent.purposes, withdrawnAt: consent.withdrawnAt }
     : undefined
+  const parked = context.kind === 'call' && context.parked === true
   await upsertCustomerRestaurant({
     customerId: customer.id,
     restaurantId: restaurant.id,
     source: codeOutcome ? 'win_back' : context.kind === 'call' ? 'organic_call' : table ? 'table' : 'page',
     firstChannel: channel,
     consentId: consent?.id,
-    ...(hasValidConsent(consentView, 'order_history')
+    ...(hasValidConsent(consentView, 'order_history') && !parked
       ? {
           order: {
             totalPaise: cart.totalPaise,
@@ -188,7 +194,9 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   }, actor)
 
   let paymentUrl: string | null = null
-  if (input.paymentMethod === 'upi_link' && cart.totalPaise > 0) {
+  if (parked) {
+    // Stays `received` and unpaid; the loop moves it to needs_attention and the counter takes it from there.
+  } else if (input.paymentMethod === 'upi_link' && cart.totalPaise > 0) {
     const link = await payments().createLink({
       orderId: order.id,
       amountPaise: cart.totalPaise,
@@ -204,7 +212,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     await transitionOrder(order.id, 'confirmed', actor)
   }
 
-  await send(input, 'order_confirm', {
+  if (!parked) await send(input, 'order_confirm', {
     restaurant: restaurant.name,
     items: cart.lines.map((l) => `${l.qty}x ${l.itemName}${l.variantName ? ` (${l.variantName})` : ''}`).join(', '),
     total: rupees(cart.totalPaise),

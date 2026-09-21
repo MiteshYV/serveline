@@ -18,9 +18,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { llm, type LlmRequest, type LlmResponse, type ToolSpec } from '../adapters/llm/index.ts'
+import { llm, LlmError, type LlmRequest, type LlmResponse, type ToolSpec } from '../adapters/llm/index.ts'
 import { placeOrder } from '../checkout/place-order.ts'
-import { CartError, priceCart } from '../core/cart.ts'
+import { CartError, priceCart, type PricedMenuItem } from '../core/cart.ts'
 import { hasValidConsent } from '../core/consent.ts'
 import {
   addCost, appendTurn, createCall, endCall as finishCall, findCustomerByPhoneHash, getConsent,
@@ -33,7 +33,7 @@ import { type BeforeModelVerdict, checkBeforeModel, onLlmFailure } from './guard
 import { costPaise } from './pricing.ts'
 import { buildSystemPrompt, greetingFor, sanitiseCallerText, type ProfileSummary } from './prompt.ts'
 import { createSession, deleteSession, getSession, type Session } from './session.ts'
-import { runTool, type ToolDeps, type ToolResult } from './tools.ts'
+import { hasOrderConsent, runTool, type ToolDeps, type ToolResult } from './tools.ts'
 
 type Outcome = NonNullable<CallRow['outcome']>
 type CustomerRow = typeof customer.$inferSelect
@@ -60,6 +60,8 @@ const TOOLS: ToolSpec[] = z.object({
 type CallState = {
   deps: ToolDeps
   profile: ProfileSummary | null
+  /** Live `order_fulfilment` consent at start; record_consent flips it mid-call (Build Spec §10). */
+  consented: boolean
   /** The next `call_turn.seq`; the greeting is 0, a caller turn is odd, its reply even. */
   seq: number
   orderId: string | null
@@ -119,7 +121,9 @@ export async function startCall(input: {
     : input.customerPhoneHash
       ? await findCustomerByPhoneHash(input.customerPhoneHash)
       : null
-  const { profile, addressId } = caller ? await loadProfile(caller, restaurant.id, outlet.id) : { profile: null, addressId: null }
+  const { profile, addressId, usualPriced } = caller ? await loadProfile(caller, restaurant.id, outlet.id) : { profile: null, addressId: null, usualPriced: [] }
+  // Build Spec §10: without it the prompt carries the spoken notice and place_order refuses.
+  const consented = caller ? await hasOrderConsent(caller.id, restaurant.id) : false
   // The page's language when there is one; else the language the customer read the notice in,
   // which customers.ts holds consent-exempt; else English. Followed per turn from here on.
   const lang = input.lang ?? caller?.preferredLanguage ?? 'en'
@@ -136,9 +140,15 @@ export async function startCall(input: {
     customerId: caller?.id ?? null, phoneHash: caller?.phoneHash ?? null, lang,
   })
   session.addressId = addressId
+  // Menu grounding (Build Spec §5.3) is "an id the model was shown in this call": the prompt shows
+  // the usual order's ids, so they count as shown, and add_to_cart can replay them without a search.
+  for (const item of usualPriced) {
+    session.seenItemIds.add(item.id)
+    session.searchResults.set(item.id, item)
+  }
   calls.set(call.id, {
     deps: { customer: caller ? { id: caller.id, phoneHash: caller.phoneHash } : null, restaurant, outlet, origin: input.origin },
-    profile, seq: 1, orderId: null, ordered: false, enquired: false, deflected: false,
+    profile, consented, seq: 1, orderId: null, ordered: false, enquired: false, deflected: false,
   })
 
   const greeting = greetingFor({ restaurant, lang, profile, transport: input.transport })
@@ -156,12 +166,12 @@ export async function startCall(input: {
  * address label read back for confirmation", so it is the delivery default and use_saved_address
  * overrides it. The prompt still tells the model to read the label back before placing.
  */
-async function loadProfile(caller: CustomerRow, restaurantId: string, outletId: string): Promise<{ profile: ProfileSummary | null; addressId: string | null }> {
+async function loadProfile(caller: CustomerRow, restaurantId: string, outletId: string): Promise<{ profile: ProfileSummary | null; addressId: string | null; usualPriced: PricedMenuItem[] }> {
   const consent = await getConsent(caller.id, restaurantId)
   const view = consent ? { noticeVersion: consent.noticeVersion, purposes: consent.purposes, withdrawnAt: consent.withdrawnAt } : undefined
   const fulfilment = hasValidConsent(view, 'order_fulfilment')
   const history = hasValidConsent(view, 'order_history')
-  if (!fulfilment && !history) return { profile: null, addressId: null }
+  if (!fulfilment && !history) return { profile: null, addressId: null, usualPriced: [] }
 
   const addresses = fulfilment ? await listAddresses(caller.id, restaurantId) : []
   const usual = history ? await usualOrderOf(caller.id, restaurantId, outletId) : null
@@ -177,7 +187,10 @@ async function loadProfile(caller: CustomerRow, restaurantId: string, outletId: 
       allergies: [],
       preferredLanguage: caller.preferredLanguage,
     },
-    addressId: addresses[0]?.id ?? null,
+    // Never pre-set: Build Spec §5.2 requires the saved label read back and confirmed, so
+    // use_saved_address / capture_rough_address are the only setters of session.addressId.
+    addressId: null,
+    usualPriced: usual?.priced ?? [],
   }
 }
 
@@ -195,14 +208,27 @@ async function usualOrderOf(customerId: string, restaurantId: string, outletId: 
   const inputs = parsed.success ? (parsed.data.items ?? parsed.data.lines ?? []) : []
   if (inputs.length === 0) return null
   const menu = await getPublishedMenu(outletId)
+  const priced = menu ? toPricedMenu(menu) : []
   try {
-    const cart = priceCart(inputs, menu ? toPricedMenu(menu) : [])
-    return { items: cart.lines.map((l) => ({ name: l.itemName, qty: l.qty })), totalPaise: cart.totalPaise }
+    const cart = priceCart(inputs, priced)
+    // Names for the greeting, ids for the replay: the greeting quotes the variant's price, so
+    // add_to_cart must re-add the variant, not the base item (review S5).
+    return {
+      items: cart.lines.map((l, i) => {
+        const input = inputs[i]
+        const name = l.variantName ? `${l.itemName} (${l.variantName})` : l.itemName
+        return { name, qty: l.qty, itemId: input?.itemId, variantId: input?.variantId, optionIds: input?.optionIds ?? [] }
+      }),
+      totalPaise: cart.totalPaise,
+      // The menu rows behind those ids: add_to_cart prices from what the session has been shown,
+      // and a replayed line was shown in the prompt, not by search_menu.
+      priced: priced.filter((p) => inputs.some((i) => i.itemId === p.id)),
+    }
   } catch (error) {
     if (!(error instanceof CartError)) throw error
     // An item has left the menu: the names say what it was, and with no total the greeting does
     // not offer it (prompt.ts greetingFor).
-    return { items: inputs.map((l) => ({ name: l.name ?? 'an item', qty: l.qty })), totalPaise: null }
+    return { items: inputs.map((l) => ({ name: l.name ?? 'an item', qty: l.qty })), totalPaise: null, priced: [] }
   }
 }
 
@@ -210,6 +236,8 @@ async function usualOrderOf(customerId: string, restaurantId: string, outletId: 
 
 export type TurnResult = {
   reply: string
+  /** The language the reply is in — the surfaces put it on the transcript line (design §9 `lang`). */
+  lang: Lang
   toolCalls: ToolCallRecord[]
   ended: boolean
   outcome?: Outcome
@@ -217,7 +245,8 @@ export type TurnResult = {
 }
 
 /** How a turn ends the call. `transfer` parks the cart as a needs_attention order (design "Handoff without a telephone"). */
-type Closing = { outcome: Outcome; reason: string; transfer: boolean }
+/** `surface`: the browser hung up or the page went away — a mundane end, not a reason §12 should read. */
+type Closing = { outcome: Outcome; reason: string; transfer: boolean; surface?: boolean }
 
 /** This turn's ledger entries, written once at the end whatever happened in between. */
 type Ledger = { llmPaise: number; tokensIn: number; tokensOut: number; smsPaise: number }
@@ -232,9 +261,9 @@ export async function takeTurn(callId: string, turn: { text: string; lang?: Lang
   const arrivedMs = elapsedMs(session)
   const seq = state.seq
   state.seq += 2
-  // Stored as spoken (calls.ts): the review screen needs what the caller said. The model sees
-  // the sanitised text, below.
-  await appendTurn(callId, { seq, speaker: 'customer', text: turn.text, language: session.lang, asrConfidence: turn.confidence, startedMs: arrivedMs })
+  // Stored sanitised, like the model sees it: call_turn is not one of the four tables that may
+  // hold a phone number (CLAUDE.md). The review screen shows "[number]" where one was spoken.
+  await appendTurn(callId, { seq, speaker: 'customer', text: sanitiseCallerText(turn.text), language: session.lang, asrConfidence: turn.confidence, startedMs: arrivedMs })
 
   const verdict = checkBeforeModel(session, { text: turn.text, confidence: turn.confidence })
   session.strikes = verdict.strikes
@@ -264,6 +293,7 @@ export async function takeTurn(callId: string, turn: { text: string; lang?: Lang
   if (answer.closing) await close(session, state, answer.closing)
   return {
     reply: answer.reply,
+    lang: session.lang,
     toolCalls: answer.toolCalls,
     ended: session.ended,
     ...(answer.closing ? { outcome: answer.closing.outcome } : {}),
@@ -304,6 +334,7 @@ async function respond(
   const system = buildSystemPrompt({
     restaurant: state.deps.restaurant, outlet: state.deps.outlet, profile: state.profile,
     lang: session.lang, now: new Date(), transport: session.transport,
+    consented: state.consented, anonymous: state.deps.customer === null,
   })
 
   const records: ToolCallRecord[] = []
@@ -351,8 +382,10 @@ async function complete(session: Session, req: LlmRequest, ledger: Ledger): Prom
     } catch (error) {
       const verdict = onLlmFailure(session)
       session.strikes = verdict.strikes
-      // The message is the adapter's own (LlmError carries provider and status, never the body).
-      console.warn(`[voice] call ${session.callId}: ${session.provider} model failed (${error instanceof Error ? error.message : 'unknown error'}) → ${verdict.action}`)
+      // Provider and status only: an adapter's message can quote the API's validation text, which
+      // can quote the request — and the request holds the prompt.
+      const what = error instanceof LlmError ? `${error.provider} ${error.status ?? 'network'}` : error instanceof Error ? error.name : 'unknown'
+      console.warn(`[voice] call ${session.callId}: ${session.provider} model failed (${what}) → ${verdict.action}`)
       if (verdict.action === 'handoff') return null
       if (verdict.action === 'switch') session.provider = verdict.provider
     }
@@ -360,6 +393,7 @@ async function complete(session: Session, req: LlmRequest, ledger: Ledger): Prom
 }
 
 const placed = z.object({ orderId: z.string() })
+const consentGiven = z.object({ agreed: z.boolean() })
 const signal = z.object({ reason: z.string() })
 const smsSent = z.object({ costPaise: z.number().int() })
 
@@ -376,6 +410,11 @@ function note(state: CallState, name: string, result: ToolResult, ledger: Ledger
     case 'send_sms':
       ledger.smsPaise += smsSent.parse(result.data).costPaise
       state.deflected = true
+      return undefined
+    case 'record_consent':
+      // A yes this turn: the prompt stops carrying the notice from the next turn on, so the
+      // assistant does not read it twice (Build Spec §10).
+      if (consentGiven.parse(result.data).agreed) state.consented = true
       return undefined
     case 'place_order':
       state.orderId = placed.parse(result.data).orderId
@@ -405,7 +444,7 @@ export async function endCall(callId: string, reason: string): Promise<void> {
   const session = getSession(callId)
   const state = calls.get(callId)
   if (!session || !state || session.ended) return
-  await close(session, state, { outcome: endOutcome(state), reason, transfer: false })
+  await close(session, state, { outcome: endOutcome(state), reason, transfer: false, surface: true })
 }
 
 /** Build Spec §5.2 post-call: the parked order on a transfer, then outcome, intent, duration and the allowance flag. */
@@ -417,7 +456,9 @@ async function close(session: Session, state: CallState, closing: Closing): Prom
   try {
     await finishCall(session.callId, {
       outcome: closing.outcome,
-      handoffReason: closing.reason,
+      // Why the assistant stopped handling the call: a transfer, a guardrail, a vendor failure.
+      // Not a hang-up — "pagehide" is not a reason, and §12's metrics read this column.
+      handoffReason: closing.surface ? undefined : closing.reason,
       intent: state.ordered ? 'order' : state.enquired ? 'enquiry' : 'unknown',
       languageDetected: session.lang,
       orderId: state.orderId ?? undefined,
@@ -439,20 +480,23 @@ async function close(session: Session, state: CallState, closing: Closing): Prom
  * chases a customer a person is about to speak to. The reason is on `call.handoff_reason` and,
  * as `notes`, on the card itself, so the counter sees why without opening the call.
  *
- * ponytail: it also sends the usual confirmation SMS, which a parked order does not strictly
- * deserve — one line in place-order.ts when it matters.
+ * `parked` tells placeOrder to skip the payment link, both SMS messages and the usual-order
+ * refresh: nobody should be asked to pay for, or greeted next time with, an order a person is
+ * about to finish or cancel by hand.
  */
 async function parkOrder(session: Session, state: CallState, reason: string): Promise<void> {
   const { deps } = state
   const caller = deps.customer ? await getCustomer(deps.customer.id) : null
   if (!caller) return // no identity to attach an order to; the transcript still has the cart
+  // Build Spec §10: the same consent gate as place_order — a parked order still writes a profile row.
+  if (!(await hasOrderConsent(caller.id, deps.restaurant.id))) return
   const result = await placeOrder({
     restaurant: deps.restaurant,
     outlet: deps.outlet,
     customer: caller,
     lang: session.lang,
     context: {
-      kind: 'call', fulfilment: 'pickup', callId: session.callId, code: session.codeText ?? undefined,
+      kind: 'call', fulfilment: 'pickup', callId: session.callId, code: session.codeText ?? undefined, parked: true,
       notes: `AI call handed off (${reason.replaceAll('_', ' ')}). Call the customer back to complete the order.`,
     },
     items: session.cart,

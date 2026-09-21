@@ -126,6 +126,48 @@ function langOf(system: string): Lang {
  * `2 Masala Dosa`. The list ends at the first `;`: prompt.ts follows it with the price and the
  * guidance sentence on the same line, which are not items.
  */
+/** The spoken consent notice the prompt carries for a caller who has not agreed yet (Build Spec §10). */
+export function spokenNoticeOf(system: string): string | null {
+  return /read this out loud, word for word[^\n]*\n"([^"]+)"/.exec(system)?.[1] ?? null
+}
+
+/** True when the assistant's last turn was the notice, so the caller's next words are the answer. */
+function noticeJustRead(messages: LlmMessage[], system: string): boolean {
+  const notice = spokenNoticeOf(system)
+  if (!notice) return false
+  const lastAi = [...messages].reverse().find((msg) => msg.role === 'assistant')
+  return lastAi?.role === 'assistant' && lastAi.text === notice
+}
+
+/** The place_order the model attempted before the consent detour, so the yes can resume it. */
+function lastPlaceArgs(messages: LlmMessage[]): Record<string, unknown> | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg?.role !== 'assistant') continue
+    const call = msg.toolCalls.find((c) => c.name === 'place_order')
+    if (call) return call.args
+  }
+  return null
+}
+
+/** `- Saved addresses (label → address_id): Home → <uuid>; …` → the first id, or null. */
+export function savedAddressIdOf(system: string): string | null {
+  const line = /saved addresses[^:\n]*:\s*([^\n]+)/i.exec(system)?.[1] ?? ''
+  return /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(line)?.[0] ?? null
+}
+
+/** `- Usual order ids: [{"item_id":…,"qty":n},…]` → add_to_cart arguments, exactly as given. */
+export function usualOrderIdsOf(system: string): Record<string, unknown>[] {
+  const raw = /usual order ids[^:\n]*:\s*(\[[^\n]*\])/i.exec(system)?.[1]
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null && 'item_id' in x) : []
+  } catch {
+    return []
+  }
+}
+
 export function usualOrderOf(system: string): { name: string; qty: number }[] {
   const line = /usual order[^:\n]*:\s*([^\n;]+)/i.exec(system)?.[1]
   if (!line) return []
@@ -231,13 +273,22 @@ function onCallerText(text: string, system: string, hasCart: boolean, t: (typeof
   if (code) return { calls: [{ name: 'apply_code', args: { code: code.toUpperCase() } }] }
 
   if (hasCart) {
-    if (/\bdeliver/.test(lower)) return { calls: [{ name: 'place_order', args: { fulfilment: 'delivery', payment_method: 'upi_link' } }] }
+    if (/\bdeliver/.test(lower)) {
+      // Build Spec §5.2: the saved label is read back and confirmed before the order; the loop no
+      // longer pre-sets an address, so a delivery goes through use_saved_address first.
+      const addressId = savedAddressIdOf(system)
+      return { calls: [addressId
+        ? { name: 'use_saved_address', args: { address_id: addressId } }
+        : { name: 'place_order', args: { fulfilment: 'delivery', payment_method: 'upi_link' } }] }
+    }
     if (/\b(pickup|pick up|pick-up|takeaway|le jaunga|le jaungi)\b/.test(lower)) {
       return { calls: [{ name: 'place_order', args: { fulfilment: 'pickup', payment_method: 'upi_link' } }] }
     }
     if (CONFIRM.test(lower)) return { calls: [{ name: 'get_cart', args: {} }] }
   } else if (CONFIRM.test(lower)) {
     // Build Spec §5.2: "same as last time?" — a yes with nothing in the cart means the usual order.
+    const ids = usualOrderIdsOf(system)
+    if (ids.length > 0) return { calls: ids.map((u) => ({ name: 'add_to_cart', args: u })) }
     const usual = usualOrderOf(system)
     if (usual.length > 0) return { calls: usual.map((u) => ({ name: 'search_menu', args: { query: u.name, language: lang } })) }
     return { text: t.askOrder }
@@ -264,18 +315,21 @@ function onToolResults(
 
   const searches = by('search_menu')
   if (searches.length > 0) {
-    // The search args live on the assistant message that asked; a usual-order search carries
-    // that item's quantity, an ordinary one the quantity the caller just said.
-    const asked = [...messages].reverse().find((m) => m.role === 'assistant')
+    // Normally the quantity is the one the caller just said. The exception is the by-name usual
+    // order — a yes with nothing in the cart, for a prompt too old to carry ids — where the
+    // quantity belongs to the remembered line, not to the word "yes". A prompt with ids never
+    // reaches here at all: it replays by id, keeping its own variant and options (review S5).
+    const replayingUsual = !cartOpen(messages) && CONFIRM.test(text.toLowerCase())
+    const asked = [...messages].reverse().find((msg) => msg.role === 'assistant')
     const argsById = new Map(asked?.role === 'assistant' ? asked.toolCalls.map((c) => [c.id, c.args]) : [])
-    const usual = usualOrderOf(system)
+    const usual = replayingUsual ? usualOrderOf(system) : []
     const calls: Decision['calls'] = []
     for (const s of searches) {
       const hit = firstArray(outcome(s.result).data)[0]
       if (!hit) continue
-      const query = argsById.get(s.id)?.query
-      const fromUsual = usual.find((u) => u.name.toLowerCase() === String(query ?? '').toLowerCase())
-      const args = addArgsFor(hit, text, fromUsual?.qty ?? qtyFrom(text))
+      const query = String(argsById.get(s.id)?.query ?? '').toLowerCase()
+      const remembered = usual.find((u) => u.name.toLowerCase() === query)
+      const args = addArgsFor(hit, text, remembered?.qty ?? qtyFrom(text))
       if (args) calls.push({ name: 'add_to_cart', args })
     }
     return calls.length > 0 ? { calls } : { text: t.notFound }
@@ -296,7 +350,21 @@ function onToolResults(
   switch (single.name) {
     case 'get_cart':
       return { text: cartSummary(o.data) ? t.readBack(cartSummary(o.data) as string) : t.askOrder }
+    case 'use_saved_address':
+      return o.ok
+        ? { calls: [{ name: 'place_order', args: { fulfilment: 'delivery', payment_method: 'upi_link' } }] }
+        : { text: t.notPlaced(reason) }
+    case 'record_consent': {
+      // A yes resumes the order the refusal interrupted; a no ends the attempt.
+      if (!(isObj(o.data) && o.data.agreed === true)) return { text: t.notPlaced(reason || 'consent') }
+      return { calls: [{ name: 'place_order', args: lastPlaceArgs(messages) ?? { fulfilment: 'pickup', payment_method: 'upi_link' } }] }
+    }
     case 'place_order':
+      if (!o.ok && o.reason === 'consent_required') {
+        // Build Spec §10: read the notice, word for word, and wait for the answer.
+        const notice = spokenNoticeOf(system)
+        if (notice) return { text: notice }
+      }
       return { text: o.ok ? t.placed : t.notPlaced(reason) }
     case 'apply_code':
       return { text: o.ok ? t.codeApplied : t.refused(reason) }
@@ -325,7 +393,9 @@ export function decide(req: LlmRequest): LlmResponse {
 
   const decision = last?.role === 'tool'
     ? onToolResults(last.results, req.messages, text, req.system, t)
-    : onCallerText(text, req.system, cartOpen(req.messages), t, lang)
+    : noticeJustRead(req.messages, req.system)
+      ? { calls: [{ name: 'record_consent', args: { agreed: CONFIRM.test(text.toLowerCase()) } }] }
+      : onCallerText(text, req.system, cartOpen(req.messages), t, lang)
 
   const toolCalls: ToolCall[] = (decision.calls ?? []).map((c, i) => ({ id: `mock-${req.messages.length}-${i}`, ...c }))
   const reply = decision.text ?? null

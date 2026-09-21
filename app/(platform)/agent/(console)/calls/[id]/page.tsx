@@ -81,7 +81,7 @@ export default async function CallReviewPage({ params, searchParams }: { params:
                       <tr>
                         <td className={`${c.right} num`}>{turn.seq}</td>
                         <td><Tag tone={turn.speaker === 'ai' ? 'strong' : 'default'}>{turn.speaker === 'ai' ? 'AI' : 'Caller'}</Tag></td>
-                        <td style={{ whiteSpace: 'pre-wrap' }}>{turn.text}</td>
+                        <td style={{ whiteSpace: 'pre-wrap', lineHeight: 'var(--lh-body)' }} lang={turn.language ?? undefined}>{turn.text}</td>
                         <td>{turn.language ?? '—'}</td>
                         <td className={`${c.right} num`}>
                           {turn.asrConfidence === null ? '—' : turn.asrConfidence.toFixed(2)}
@@ -152,7 +152,7 @@ export default async function CallReviewPage({ params, searchParams }: { params:
             </dl>
           </Panel>
 
-          <Panel title="Tag" actions={<span className={c.muted}>For M4's tuning loop (Build Spec §8)</span>}>
+          <Panel title="Tag" actions={<span className={c.muted}>Tag what went wrong; tags feed the menu-vocabulary tuning</span>}>
             <form action={saveTag} className={c.inlineForm}>
               <input type="hidden" name="id" value={call.id} />
               <Field id="tag" label="Failure" className="w-[200px]">

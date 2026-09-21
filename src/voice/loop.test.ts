@@ -67,6 +67,10 @@ await db.insert(schema.discountCode).values({ restaurantId: restaurant.id, code:
 const phoneB = '+919876543211'
 const bala = await repos.upsertCustomer({ phone: phoneB, phoneHash: hashPhone(phoneB, PEPPER) }, SYSTEM)
 
+// A caller who never agrees: used only to prove that a handoff parks nothing without consent.
+const phoneC = '+919876543212'
+const chetan = await repos.upsertCustomer({ phone: phoneC, phoneHash: hashPhone(phoneC, PEPPER) }, SYSTEM)
+
 // A returning caller: consent for fulfilment and history, a name, a saved address, a usual order.
 const phoneA = '+919876543210'
 const anitaId = (await repos.upsertCustomer({ phone: phoneA, phoneHash: hashPhone(phoneA, PEPPER) }, SYSTEM)).id
@@ -132,18 +136,33 @@ describe('a three-item Hindi order with a variant (acceptance 1, 5)', () => {
     assert.match(t4.reply, /आपका ऑर्डर/)
 
     mockInbox.clear()
+    // Build Spec §10: this caller has never agreed to anything, so the first place_order is
+    // refused and the assistant reads the spoken notice instead.
     const t5 = await takeTurn(started.callId, { text: 'pickup', lang: 'hi' })
     assert.deepEqual(names(t5), ['place_order'])
-    assert.ok(t5.orderId, 'place_order succeeded')
+    assert.equal(t5.orderId, undefined, 'no order without consent')
+    assert.match(t5.reply, /ऑर्डर लेने से पहले/, 'the notice is read, in the caller\'s language')
     assert.equal(t5.ended, false)
+
+    const t5b = await takeTurn(started.callId, { text: 'haan, theek hai', lang: 'hi' })
+    assert.deepEqual(names(t5b), ['record_consent', 'place_order'])
+    assert.ok(t5b.orderId, 'the yes records consent and the order follows')
     assert.ok(mockInbox.list().some((m) => m.kind === 'payment_link'), 'the payment link is in the mock SMS inbox')
+
+    const consent = await repos.getConsent(bala.id, restaurant.id)
+    assert.ok(consent)
+    assert.deepEqual(
+      [consent.channel, consent.noticeVersion, consent.language, [...consent.purposes].sort()],
+      ['call', NOTICE_VERSION, 'hi', ['order_fulfilment', 'order_history']],
+    )
+    assert.equal((consent.evidence as { callId?: string }).callId, started.callId, 'the call is the evidence')
 
     const t6 = await takeTurn(started.callId, { text: 'bye', lang: 'hi' })
     assert.deepEqual(names(t6), ['end_call'])
-    assert.deepEqual([t6.ended, t6.outcome, t6.orderId], [true, 'completed', t5.orderId])
+    assert.deepEqual([t6.ended, t6.outcome, t6.orderId], [true, 'completed', t5b.orderId])
     assert.equal(getSession(started.callId), null, 'the session is gone once the call ends')
 
-    const order = await repos.getOrder(t5.orderId)
+    const order = await repos.getOrder(t5b.orderId)
     assert.ok(order)
     assert.deepEqual(
       [order.channel, order.fulfilment, order.callId, order.customerId, order.paymentMethod, order.status, order.totalPaise],
@@ -160,11 +179,13 @@ describe('a three-item Hindi order with a variant (acceptance 1, 5)', () => {
     assert.equal(call.fromPhoneHash, bala.phoneHash)
     assert.equal(typeof call.durationSec, 'number')
     assert.ok(call.endedAt)
-    // The greeting is 0, then customer/ai pairs: 1 + 6 × 2.
-    assert.equal(call.turns.length, 13)
+    // The greeting is 0, then customer/ai pairs: 1 + 7 × 2 — the consent answer is a turn like any other.
+    assert.equal(call.turns.length, 15)
     assert.deepEqual(call.turns.slice(0, 3).map((t) => [t.seq, t.speaker]), [[0, 'ai'], [1, 'customer'], [2, 'ai']])
     assert.equal(call.turns[0]?.text, started.greeting)
-    assert.equal(call.turns[1]?.text, 'do masala dosa, mera number 98765 43210 hai')
+    // CLAUDE.md: call_turn is not one of the four tables that may hold a phone number, so the
+    // stored transcript carries the same sanitised text the model saw (review S7).
+    assert.equal(call.turns[1]?.text, 'do masala dosa, mera number [number] hai')
     assert.equal(call.turns[1]?.asrConfidence, 0.92)
     const recorded = call.turns[2]?.toolCalls as { name: string; args: unknown; result: unknown; ms: number }[]
     assert.deepEqual(recorded.map((c) => c.name), ['search_menu', 'add_to_cart'])
@@ -180,11 +201,13 @@ describe('a three-item Hindi order with a variant (acceptance 1, 5)', () => {
 
 describe('"I want to talk to someone" (acceptance 2)', () => {
   it('ends the call with a handoff and parks the cart as a needs_attention order', async () => {
-    const started = await startCall({ outletId: outlet.id, transport: 'browser', customerPhoneHash: bala.phoneHash, origin: ORIGIN })
+    const before = await repos.getCustomerRestaurant(anita.id, restaurant.id)
+    const started = await startCall({ outletId: outlet.id, transport: 'browser', customerPhoneHash: anita.phoneHash, origin: ORIGIN })
     assert.equal(started.lang, 'en')
     const t1 = await takeTurn(started.callId, { text: 'one masala dosa' })
     assert.equal(okCalls(t1, 'add_to_cart').length, 1)
 
+    mockInbox.clear()
     const t2 = await takeTurn(started.callId, { text: 'I want to talk to someone' })
     assert.deepEqual(names(t2), ['transfer_to_human'])
     assert.deepEqual([t2.ended, t2.outcome], [true, 'handoff'])
@@ -195,16 +218,36 @@ describe('"I want to talk to someone" (acceptance 2)', () => {
     assert.ok(order)
     assert.deepEqual(
       [order.status, order.channel, order.fulfilment, order.callId, order.customerId],
-      ['needs_attention', 'ai_call', 'pickup', started.callId, bala.id],
+      ['needs_attention', 'ai_call', 'pickup', started.callId, anita.id],
     )
     assert.deepEqual(order.items.map((i) => [i.nameSnapshot, i.qty]), [['Masala Dosa', 1]])
-    assert.deepEqual(order.events.map((e) => e.toStatus), ['received', 'confirmed', 'needs_attention'])
+    assert.deepEqual(order.events.map((e) => e.toStatus), ['received', 'needs_attention'])
     assert.equal(order.notes, 'AI call handed off (customer request). Call the customer back to complete the order.')
+
+    // A parked order is not a placed one (review S4): nobody is asked to pay for it, nobody is
+    // told it is confirmed, and it does not become the caller's "same as last time".
+    assert.deepEqual(mockInbox.list().map((m) => m.kind), [])
+    const after = await repos.getCustomerRestaurant(anita.id, restaurant.id)
+    assert.deepEqual(after?.usualOrder, before?.usualOrder, 'the usual order is untouched by a parked order')
 
     const call = await repos.getCall(started.callId)
     assert.ok(call)
     assert.deepEqual([call.outcome, call.handoffReason, call.intent, call.orderId], ['handoff', 'customer_request', 'order', order.id])
     assert.ok(call.cost)
+  })
+
+  // Build Spec §10: placeOrder writes a profile row, so a caller who never agreed gets no order —
+  // the handoff still happens, and the transcript keeps the cart for the counter.
+  it('parks nothing for a caller who has not agreed to the notice', async () => {
+    const started = await startCall({ outletId: outlet.id, transport: 'browser', customerId: chetan.id, origin: ORIGIN })
+    const t1 = await takeTurn(started.callId, { text: 'one masala dosa' })
+    assert.equal(okCalls(t1, 'add_to_cart').length, 1)
+
+    const t2 = await takeTurn(started.callId, { text: 'I want to talk to someone' })
+    assert.deepEqual([t2.ended, t2.outcome, t2.orderId], [true, 'handoff', undefined])
+    const call = await repos.getCall(started.callId)
+    assert.deepEqual([call?.outcome, call?.orderId], ['handoff', null])
+    assert.equal(await repos.getConsent(chetan.id, restaurant.id), null, 'nothing was recorded on their behalf')
   })
 
   it('a handoff with an empty cart parks nothing', async () => {
@@ -230,8 +273,10 @@ describe('the returning customer (acceptance 4)', () => {
     assert.match(t1.reply, /Anything else/)
     assert.equal(t1.ended, false)
 
+    // Build Spec §5.2: the saved label is confirmed before the order, so delivery is
+    // use_saved_address then place_order — the loop no longer pre-sets an address (review S3).
     const t2 = await takeTurn(started.callId, { text: 'delivery please' })
-    assert.deepEqual(names(t2), ['place_order'])
+    assert.deepEqual(names(t2), ['use_saved_address', 'place_order'])
     assert.ok(t2.orderId, 'placed on the second turn')
     assert.match(t2.reply, /order is placed/)
 

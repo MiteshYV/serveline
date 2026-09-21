@@ -18,13 +18,13 @@ import { vendorMode } from '../adapters/mode.ts'
 import { sms } from '../adapters/sms/index.ts'
 import { placeOrder, resolveCode } from '../checkout/place-order.ts'
 import { CartError, priceCart, type CartItemInput } from '../core/cart.ts'
-import { hasValidConsent } from '../core/consent.ts'
+import { NOTICE_VERSION, hasValidConsent } from '../core/consent.ts'
 import { checkServiceability } from '../core/serviceability.ts'
 import {
-  getConsent, getCustomer, getOrder, getPublishedMenu, listAddresses, logSms, saveAddress,
-  toPricedMenu, type Actor,
+  getConsent, getCustomer, getOrder, getPublishedMenu, listAddresses, logSms, recordConsent, saveAddress, toPricedMenu, type Actor,
 } from '../db/repos/index.ts'
 import type { outlet, restaurant } from '../db/schema/index.ts'
+import { SPOKEN_PURPOSES } from './notice.ts'
 import type { Session } from './session.ts'
 
 export type ToolResult = { ok: true; data: unknown } | { ok: false; reason: string; detail?: unknown }
@@ -57,6 +57,7 @@ export const TOOL_SCHEMAS = {
   use_saved_address: z.object({ address_id: z.string().min(1) }),
   capture_rough_address: z.object({ text: z.string().min(3).max(300) }),
   send_sms: z.object({ kind: z.enum(['page_link', 'payment_link']) }),
+  record_consent: z.object({ agreed: z.boolean() }),
   place_order: z.object({ fulfilment: z.enum(['delivery', 'pickup']), payment_method: z.enum(['upi_link', 'cod']) }),
   answer_enquiry: z.object({ kind: z.enum(['hours', 'address', 'delivery', 'menu']) }),
   transfer_to_human: z.object({ reason: z.string().min(1).max(200) }),
@@ -152,6 +153,13 @@ function hoursText(o: ToolDeps['outlet']): string {
 
 // --- handlers ------------------------------------------------------------------------------------
 
+/** Live `order_fulfilment` consent for this caller at this restaurant — the gate in front of any profile write. */
+export async function hasOrderConsent(customerId: string, restaurantId: string): Promise<boolean> {
+  const consent = await getConsent(customerId, restaurantId)
+  const view = consent ? { noticeVersion: consent.noticeVersion, purposes: consent.purposes, withdrawnAt: consent.withdrawnAt } : undefined
+  return hasValidConsent(view, 'order_fulfilment')
+}
+
 const handlers: { [K in ToolName]: Handler<K> } = {
   async search_menu({ query }, session, deps) {
     // `language` is accepted for the M4 vocabulary; the M2 matcher above is language-blind.
@@ -243,9 +251,9 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     const row = await saveAddress({
       customerId: deps.customer.id,
       restaurantId: deps.restaurant.id,
-      // What was said is the address's name until the link confirms it: it is what the counter
-      // reads on the card and what the model reads back.
-      label: text,
+      // A fixed label, never the spoken text: the label goes into the prompt on the next call and
+      // into tool results (Build Spec §10 — no full address enters the prompt). The text is line1.
+      label: 'Spoken address',
       line1: text,
       source: 'voice_rough',
       isConfirmed: false,
@@ -274,11 +282,36 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     }
   },
 
+  /**
+   * Build Spec §10: "Voice consent is the spoken yes after the notice, captured as channel = call
+   * with the call id as evidence." The notice is in the prompt, already read aloud by the time
+   * this is called; what is recorded here is the answer, against the version whose spoken
+   * rendering the caller actually heard (src/voice/notice.ts).
+   */
+  async record_consent({ agreed }, session, deps) {
+    if (!deps.customer) return refuse('customer_required')
+    if (!agreed) return ok({ agreed: false })
+    if (await hasOrderConsent(deps.customer.id, deps.restaurant.id)) return ok({ agreed: true, already: true })
+    await recordConsent({
+      customerId: deps.customer.id,
+      restaurantId: deps.restaurant.id,
+      noticeVersion: NOTICE_VERSION,
+      purposes: [...SPOKEN_PURPOSES],
+      channel: 'call',
+      language: session.lang,
+      evidence: { callId: session.callId, transport: session.transport, rendering: 'spoken' },
+    }, AI)
+    return ok({ agreed: true })
+  },
+
   async place_order({ fulfilment, payment_method }, session, deps) {
     // The read-back (Build Spec §5.2) is the prompt's rule; the one thing checked here is that
     // there is something to place, so the model gets a reason rather than placeOrder's.
     if (session.cart.length === 0) return refuse('empty_cart')
     if (!deps.customer) return refuse('customer_required')
+    // Build Spec §10: placeOrder writes a customer_restaurant profile row, and the web checkout
+    // gates that on live consent before calling it. So does the call.
+    if (!(await hasOrderConsent(deps.customer.id, deps.restaurant.id))) return refuse('consent_required')
     const customer = await getCustomer(deps.customer.id)
     if (!customer) return refuse('customer_required')
     const result = await placeOrder({
