@@ -66,7 +66,8 @@ test('the request has the documented shape and the response is parsed; a 503 is 
   assert.deepEqual(body.systemInstruction, { parts: [{ text: 'Language: en' }] })
   assert.deepEqual(body.tools, [{ functionDeclarations: [{ name: 'get_cart', description: 'The cart', parameters: { type: 'object', properties: {} } }] }])
   assert.deepEqual(body.toolConfig, { functionCallingConfig: { mode: 'AUTO' } })
-  assert.deepEqual(body.generationConfig, { maxOutputTokens: 1024 })
+  // ADR 0006: thinking costs seconds a phone call does not have.
+  assert.deepEqual(body.generationConfig, { maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'low' } })
 
   assert.deepEqual(res, {
     text: 'Hi! ',

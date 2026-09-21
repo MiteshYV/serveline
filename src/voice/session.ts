@@ -28,6 +28,8 @@ export type Session = {
   addressId: string | null
   codeText: string | null
   turnCount: number
+  /** The spoken consent notice has been read aloud in this call; record_consent refuses until it has. */
+  noticeRead: boolean
   strikes: { abuse: number; lowConfidence: number; llmFailures: number }
   provider: 'primary' | 'secondary'
   messages: LlmMessage[]
@@ -67,6 +69,7 @@ export function createSession(init: {
     addressId: null,
     codeText: null,
     turnCount: 0,
+    noticeRead: false,
     strikes: { abuse: 0, lowConfidence: 0, llmFailures: 0 },
     provider: 'primary',
     messages: [],

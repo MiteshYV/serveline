@@ -22,3 +22,26 @@ export function spokenNotice(lang: Lang, restaurantName: string): string {
   const body = raw.split(/^---$/m).slice(2).join('---').trim()
   return body.replaceAll('{{restaurant_name}}', restaurantName).replace(/\s*\n\s*/g, ' ')
 }
+
+const squash = (t: string) => t.replace(/\s+/g, ' ').trim()
+
+/**
+ * Was the notice actually read out, word for word, in this reply?
+ *
+ * The gate on `place_order` guarantees consent is *recorded*; on its own it does not guarantee the
+ * caller ever heard what they were agreeing to, because reading the notice is the prompt's
+ * instruction and a model may skip an instruction. Consent recorded without the notice is not
+ * consent. So `record_consent` refuses until this returns true — the same shape as menu grounding
+ * (Build Spec §5.3): the tool refuses what the model did not earn.
+ *
+ * Checked in segments around the restaurant's name, so the name itself is not what is matched, and
+ * every clause of the notice has to be present. Short segments are ignored: punctuation between
+ * two mentions of the name carries no meaning to test.
+ */
+export function noticeWasRead(reply: string, lang: Lang, restaurantName: string): boolean {
+  const spoken = squash(spokenNotice(lang, restaurantName))
+  const segments = spoken.split(restaurantName).map(squash).filter((part) => part.length > 15)
+  if (segments.length === 0) return false
+  const said = squash(reply)
+  return segments.every((part) => said.includes(part))
+}

@@ -29,6 +29,7 @@ const { SYSTEM } = await import('../db/repos/_actor.ts')
 const { mockInbox } = await import('../adapters/sms/mock.ts')
 const { createSession, deleteSession, getSession } = await import('./session.ts')
 const { runTool, TOOL_NAMES, TOOL_SCHEMAS } = await import('./tools.ts')
+const { noticeWasRead, spokenNotice } = await import('./notice.ts')
 
 await migrate(db, { migrationsFolder: fileURLToPath(new URL('../db/migrations', import.meta.url)) })
 after(() => db.$client.close())
@@ -306,5 +307,43 @@ describe('signals, validation and the session store', () => {
     assert.equal(getSession(s.callId), s)
     deleteSession(s.callId)
     assert.equal(getSession(s.callId), null)
+  })
+})
+
+describe('record_consent (Build Spec §10, ADR 0005)', () => {
+  it('refuses until the notice has actually been read out', async () => {
+    const s = await newCall(bala.id)
+    // Nothing has been said yet, so there is nothing the caller could have agreed to.
+    assert.deepEqual(await runTool('record_consent', { agreed: true }, s, asBala), { ok: false, reason: 'notice_not_read' })
+    assert.equal(await repos.getConsent(bala.id, restaurant.id), null)
+
+    // The loop sets this when the reply carries the notice word for word.
+    s.noticeRead = true
+    assert.deepEqual(await runTool('record_consent', { agreed: true }, s, asBala), { ok: true, data: { agreed: true } })
+    const consent = await repos.getConsent(bala.id, restaurant.id)
+    assert.ok(consent)
+    assert.deepEqual(
+      [consent.channel, consent.noticeVersion, [...consent.purposes].sort()],
+      ['call', NOTICE_VERSION, ['order_fulfilment', 'order_history']],
+    )
+    assert.equal((consent.evidence as { callId?: string }).callId, s.callId)
+  })
+
+  it('records nothing for a no, and needs an identity', async () => {
+    const s = await newCall(bala.id)
+    s.noticeRead = true
+    assert.deepEqual(await runTool('record_consent', { agreed: false }, s, asBala), { ok: true, data: { agreed: false } })
+    assert.deepEqual(await runTool('record_consent', { agreed: true }, s, anonymous), { ok: false, reason: 'customer_required' })
+  })
+})
+
+describe('noticeWasRead', () => {
+  it('accepts the notice read word for word and refuses a paraphrase', () => {
+    const spoken = spokenNotice('en', restaurant.name)
+    assert.equal(noticeWasRead(spoken, 'en', restaurant.name), true)
+    // Whitespace is the model's to choose; the words are not.
+    assert.equal(noticeWasRead(`  ${spoken.replace(/ /g, '  ')}  `, 'en', restaurant.name), true)
+    assert.equal(noticeWasRead('Is it alright if we keep your details?', 'en', restaurant.name), false)
+    assert.equal(noticeWasRead(spoken.slice(0, 60), 'en', restaurant.name), false)
   })
 })

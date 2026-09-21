@@ -292,6 +292,9 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     if (!deps.customer) return refuse('customer_required')
     if (!agreed) return ok({ agreed: false })
     if (await hasOrderConsent(deps.customer.id, deps.restaurant.id)) return ok({ agreed: true, already: true })
+    // The caller cannot agree to words they were never read. The loop sets this when the notice
+    // actually goes out (src/voice/notice.ts noticeWasRead); until then there is nothing to record.
+    if (!session.noticeRead) return refuse('notice_not_read')
     await recordConsent({
       customerId: deps.customer.id,
       restaurantId: deps.restaurant.id,

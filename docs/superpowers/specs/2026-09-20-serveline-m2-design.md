@@ -136,9 +136,9 @@ read. Every simulator call is a real call row with `transport = browser`.
 ## Adapters
 
 `src/adapters/llm/`: `complete({ system, messages, tools }) → { text?, toolCalls[], usage }`.
-Gemini via its documented REST API with `fetch`; Anthropic via the official `@anthropic-ai/sdk`
-(Claude Haiku 4.5, the spec's second provider, with the SDK's typed tool-use loop); and a mock that
-follows a scripted policy for tests and for a demo without a key. The primary and
+Gemini via its documented REST API with `fetch` (`gemini-3.5-flash-lite`, chosen by measurement —
+ADR 0006); Anthropic via the official `@anthropic-ai/sdk` (Claude Haiku 4.5, the spec's second
+provider); and a mock that follows a scripted policy for tests and for a demo without a key. The primary and
 secondary are `LLM_PRIMARY_PROVIDER` / `LLM_SECONDARY_PROVIDER`; failover is in `loop.ts`, not in the
 adapters.
 

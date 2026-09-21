@@ -18,7 +18,17 @@ import { mockLlmAdapter } from './mock.ts'
  */
 export type ToolSpec = { name: string; description: string; parameters: Record<string, unknown> }
 
-export type ToolCall = { id: string; name: string; args: Record<string, unknown> }
+export type ToolCall = {
+  id: string
+  name: string
+  args: Record<string, unknown>
+  /**
+   * Whatever the provider needs handed back with this call, opaque to everyone else. Gemini 3
+   * requires its `thoughtSignature` echoed on the model turn or it rejects the next request; the
+   * loop stores messages and replays them, so it carries this without knowing what is in it.
+   */
+  meta?: Record<string, unknown>
+}
 
 export type LlmMessage =
   | { role: 'user'; text: string }

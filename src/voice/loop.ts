@@ -31,6 +31,7 @@ import type { customer } from '../db/schema/index.ts'
 import type { Lang } from '../ui/i18n.ts'
 import { type BeforeModelVerdict, checkBeforeModel, onLlmFailure } from './guardrails.ts'
 import { costPaise } from './pricing.ts'
+import { noticeWasRead } from './notice.ts'
 import { buildSystemPrompt, greetingFor, sanitiseCallerText, type ProfileSummary } from './prompt.ts'
 import { createSession, deleteSession, getSession, type Session } from './session.ts'
 import { hasOrderConsent, runTool, type ToolDeps, type ToolResult } from './tools.ts'
@@ -348,7 +349,13 @@ async function respond(
     // Calls that will not run are not recorded as asked: a real provider refuses the next request
     // if a tool call in the history has no result.
     session.messages.push({ role: 'assistant', text: response.text, toolCalls: execute ? response.toolCalls : [] })
-    if (response.text) reply = response.text
+    if (response.text) {
+      reply = response.text
+      // Build Spec §10: consent follows the notice, so the tool needs to know it went out.
+      if (!session.noticeRead && noticeWasRead(response.text, session.lang, state.deps.restaurant.name)) {
+        session.noticeRead = true
+      }
+    }
     if (!execute) break
 
     const results: { id: string; name: string; result: unknown }[] = []

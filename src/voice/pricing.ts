@@ -19,10 +19,14 @@ export const PRICES_AS_OF = '2026-09-20'
 // cents per million tokens × ₹ per dollar = paise per million tokens.
 export const PRICES = {
   gemini: {
-    model: 'gemini-2.5-flash',
-    // ai.google.dev/gemini-api/docs/pricing, paid tier, text: $0.30 in, $2.50 out. Verified 2026-09-20.
-    inPaisePerMTok: 30 * INR_PER_USD,
-    outPaisePerMTok: 250 * INR_PER_USD,
+    // ADR 0006: the model moved to the lite tier because a phone call cannot wait for the full
+    // Flash models. Pricing is the lite tier's, and lower than the 2.5 Flash line the Build Spec
+    // §10 cost table assumed — the ₹8–20 per call estimate there still holds with room to spare.
+    model: 'gemini-3.5-flash-lite',
+    // ai.google.dev/gemini-api/docs/pricing, paid tier, text: $0.10 in, $0.40 out.
+    // UNVERIFIED at 2026-09-21 — the pricing page was not reachable from here; re-check at kickoff.
+    inPaisePerMTok: 10 * INR_PER_USD,
+    outPaisePerMTok: 40 * INR_PER_USD,
   },
   anthropic: {
     model: 'claude-haiku-4-5',

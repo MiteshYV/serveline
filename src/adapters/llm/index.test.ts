@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 import { llm } from './index.ts'
 import { mockLlmAdapter } from './mock.ts'
+import { GEMINI_MODEL } from './gemini.ts'
 
 const VARS = ['VENDOR_MODE', 'LLM_PRIMARY_PROVIDER', 'LLM_PRIMARY_API_KEY', 'LLM_SECONDARY_PROVIDER', 'LLM_SECONDARY_API_KEY'] as const
 const saved = Object.fromEntries(VARS.map((v) => [v, process.env[v]]))
@@ -33,7 +34,7 @@ test('a provider named without its key fails loudly, whatever the mode', () => {
 test('a provider named with its key is selected; "mock" and unknown names are handled', () => {
   setEnv({ LLM_PRIMARY_PROVIDER: 'gemini', LLM_PRIMARY_API_KEY: 'g', LLM_SECONDARY_PROVIDER: 'anthropic', LLM_SECONDARY_API_KEY: 'a' })
   assert.equal(llm('primary').provider, 'gemini')
-  assert.equal(llm('primary').model, 'gemini-2.5-flash')
+  assert.equal(llm('primary').model, GEMINI_MODEL)
   assert.equal(llm('secondary').provider, 'anthropic')
   assert.equal(llm('secondary').model, 'claude-haiku-4-5')
 
