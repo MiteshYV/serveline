@@ -25,6 +25,7 @@ import {
 } from '../db/repos/index.ts'
 import type { customer, outlet, restaurant } from '../db/schema/index.ts'
 import type { Lang } from '../ui/i18n.ts'
+import { signAddressToken } from '../auth/jwt.ts'
 
 /** Decided from the URL at load and never asked (design §7.4): `?t=` is a table, anything else is delivery. */
 export type PageContext = { kind: 'table'; tableNo: string } | { kind: 'delivery'; code?: string }
@@ -93,7 +94,17 @@ export type PlaceOrderFailure =
   | CartErrorCode
 
 export type PlaceOrderResult =
-  | { ok: true; orderId: string; paymentUrl: string | null }
+  | {
+      ok: true
+      orderId: string
+      paymentUrl: string | null
+      /**
+       * The delivery address was captured by voice and nobody has confirmed it, so the order is
+       * `address_pending` and the SMS that went out is the link to confirm it — not a bill. The
+       * caller has to be told that, so the caller's assistant has to be told it first.
+       */
+      addressPending: boolean
+    }
   | { ok: false; reason: PlaceOrderFailure; code?: CodeOutcome & { ok: false } }
 
 export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
@@ -114,13 +125,21 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   if (!table && input.paymentMethod === 'pay_at_table') return { ok: false, reason: 'bad_payment_method' }
   if (input.paymentMethod === 'cod' && !outlet.codEnabled) return { ok: false, reason: 'cod_disabled' }
 
-  let addressId: string | undefined
+  let address: Awaited<ReturnType<typeof listAddresses>>[number] | undefined
   if (delivery) {
     // Ownership check: the id came from the URL. An address of another customer is "no address".
     const addresses = await listAddresses(customer.id, restaurant.id)
-    addressId = addresses.find((a) => a.id === input.addressId)?.id
-    if (!addressId) return { ok: false, reason: 'address_required' }
+    address = addresses.find((a) => a.id === input.addressId)
+    if (!address) return { ok: false, reason: 'address_required' }
   }
+  const addressId = address?.id
+  /**
+   * Build Spec §5.2 and Ideation §8: "Indian addresses do not survive a phone call." A new caller
+   * gives an area and a landmark, `capture_rough_address` stores it unconfirmed, and the order is
+   * created `address_pending` with a link by SMS rather than sent to a kitchen on a guess. Payment
+   * waits for the address: nobody should be asked to pay for a delivery to somewhere unknown.
+   */
+  const addressPending = delivery && address !== undefined && !address.isConfirmed
 
   const menu = await getPublishedMenu(outlet.id)
   if (!menu) return { ok: false, reason: 'menu_unavailable' }
@@ -148,6 +167,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     callId: context.kind === 'call' ? context.callId : undefined,
     // A parked handoff order carries its reason on the card (design "Handoff without a telephone").
     notes: context.kind === 'call' ? context.notes : undefined,
+    addressStatus: addressPending ? 'pending' : delivery ? 'confirmed' : 'na',
     paymentMethod: input.paymentMethod,
     discountCodeId: codeOutcome?.codeId,
     cart,
@@ -196,6 +216,12 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   let paymentUrl: string | null = null
   if (parked) {
     // Stays `received` and unpaid; the loop moves it to needs_attention and the counter takes it from there.
+  } else if (addressPending) {
+    await transitionOrder(order.id, 'address_pending', actor)
+    await send(input, 'address_link', {
+      restaurant: restaurant.name,
+      url: absolute(input.origin, `/r/${restaurant.slug}/address/${await signAddressToken(order.id)}`),
+    })
   } else if (input.paymentMethod === 'upi_link' && cart.totalPaise > 0) {
     const link = await payments().createLink({
       orderId: order.id,
@@ -212,20 +238,55 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     await transitionOrder(order.id, 'confirmed', actor)
   }
 
-  if (!parked) await send(input, 'order_confirm', {
+  // An `address_pending` order has had its SMS — the link — and is not confirmed to anybody yet.
+  if (!parked && !addressPending) await send(input, 'order_confirm', {
     restaurant: restaurant.name,
     items: cart.lines.map((l) => `${l.qty}x ${l.itemName}${l.variantName ? ` (${l.variantName})` : ''}`).join(', '),
     total: rupees(cart.totalPaise),
     paymentMode: PAYMENT_MODE[input.paymentMethod][input.lang],
   })
 
-  return { ok: true, orderId: order.id, paymentUrl }
+  return { ok: true, orderId: order.id, paymentUrl, addressPending }
 }
 
 /** GSM-7 only (templates.ts): a ₹ would triple the cost of an otherwise-English message. */
 const rupees = (p: Paise) => `Rs ${(paise(p) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 
 const absolute = (origin: string, url: string) => (url.startsWith('/') ? `${origin}${url}` : url)
+
+/**
+ * The payment link, issued after the fact. A delivery order taken by voice withholds it until the
+ * address is confirmed (Build Spec §5.2): nobody should be asked to pay for a delivery to an
+ * address nobody has checked. The address page calls this once the customer has confirmed, so the
+ * link and its SMS are created in exactly one place.
+ *
+ * Idempotent by the caller's contract: only an order that is still unpaid should be passed here.
+ */
+export async function issuePaymentLink(input: {
+  order: { id: string; totalPaise: number; paymentMethod: 'upi_link' | 'cod' | 'pay_at_table'; paymentStatus: string }
+  restaurant: { id: string; name: string }
+  customer: { phone: string; phoneHash: string }
+  lang: Lang
+  origin: string
+  actor: Actor
+}): Promise<string | null> {
+  const { order, restaurant, customer, lang, origin, actor } = input
+  if (order.paymentMethod !== 'upi_link' || order.totalPaise <= 0 || order.paymentStatus === 'paid') return null
+
+  const link = await payments().createLink({
+    orderId: order.id,
+    amountPaise: order.totalPaise,
+    restaurantId: restaurant.id,
+    description: `${restaurant.name} order`,
+  })
+  await attachPayment({ orderId: order.id, gateway: gatewayName(), linkId: link.linkId, amountPaise: order.totalPaise }, actor)
+  await send({ restaurant, customer, lang }, 'payment_link', {
+    restaurant: restaurant.name,
+    total: rupees(paise(order.totalPaise)),
+    url: absolute(origin, link.url),
+  })
+  return link.url
+}
 
 const gatewayName = () => (vendorMode() === 'mock' ? 'mock' : 'razorpay')
 
@@ -241,9 +302,15 @@ const PAYMENT_MODE: Record<PlaceOrderInput['paymentMethod'], Record<Lang, string
  * must not fail the order — the order exists and the counter has it — so it is logged and
  * swallowed; the customer still has the status page.
  */
+type SmsTarget = {
+  restaurant: { id: string; name: string }
+  customer: { phone: string; phoneHash: string }
+  lang: Lang
+}
+
 async function send(
-  input: PlaceOrderInput,
-  kind: 'order_confirm' | 'payment_link',
+  input: SmsTarget,
+  kind: 'order_confirm' | 'payment_link' | 'address_link',
   vars: Record<string, string>,
 ): Promise<void> {
   const provider = vendorMode() === 'mock' ? 'mock' : 'exotel'

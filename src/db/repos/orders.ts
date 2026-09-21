@@ -24,6 +24,8 @@ type PaymentRow = typeof payment.$inferSelect
 const TERMINAL = (Object.keys(ORDER_TRANSITIONS) as OrderStatus[]).filter(isTerminal)
 
 export type CreateOrderInput = {
+  /** Overrides the default: `pending` for an address the customer has not confirmed. */
+  addressStatus?: 'na' | 'pending' | 'confirmed'
   restaurantId: string
   outletId: string
   channel: OrderRow['channel']
@@ -79,7 +81,9 @@ export async function createOrder(input: CreateOrderInput, actor: Actor): Promis
           // ponytail: at M1 a delivery address only ever arrives typed by the customer on the
           // page, so it is confirmed by construction. M2's voice_rough addresses land as
           // `pending` and the address link confirms them (Build Spec §6).
-          addressStatus: input.fulfilment !== 'delivery' ? 'na' : input.addressId ? 'confirmed' : 'pending',
+          // A delivery with an address is confirmed unless the caller says otherwise: a voice-captured
+          // address exists but has not been checked by the customer yet (Build Spec §5.2).
+          addressStatus: input.addressStatus ?? (input.fulfilment !== 'delivery' ? 'na' : input.addressId ? 'confirmed' : 'pending'),
           callId: input.callId ?? null,
           notes: input.notes ?? null,
         })

@@ -240,8 +240,8 @@ const handlers: { [K in ToolName]: Handler<K> } = {
   },
 
   async capture_rough_address({ text }, session, deps) {
-    // ponytail: the address-link SMS and the `address_pending` state are M3; at M2 the rough
-    // address is saved unconfirmed and the order goes ahead against it.
+    // Build Spec §5.2: stored unconfirmed, so `placeOrder` creates the order `address_pending` and
+    // sends the link by SMS rather than sending a rider to a guess.
     if (!deps.customer) return refuse('customer_required')
     const consent = await getConsent(deps.customer.id, deps.restaurant.id)
     // Build Spec §10: an address is a profile field beyond the phone number. `saveAddress` holds
@@ -334,6 +334,8 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     return ok({
       orderId: order.id,
       totalPaise: order.totalPaise,
+      // What the caller should be told went to their phone (Build Spec §5.2).
+      addressPending: result.addressPending,
       totalRupees: rupees(order.totalPaise),
       paymentMethod: payment_method,
       // The link itself went by SMS; the model only needs to know whether to say so.

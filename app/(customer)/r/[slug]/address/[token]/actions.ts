@@ -8,7 +8,8 @@ import { createSession } from '@/auth/session.ts'
 import { hasValidConsent, NOTICE_VERSION } from '@/core/consent.ts'
 import { checkServiceability } from '@/core/serviceability.ts'
 import { confirmAddress, getConsent, getCustomer, getOrder, recordConsent, saveAddress } from '@/db/repos/index.ts'
-import { clientIp, currentLang, loadRestaurant, withQuery } from '../../lib.ts'
+import { issuePaymentLink } from '@/checkout/place-order.ts'
+import { clientIp, currentLang, loadRestaurant, origin, withQuery } from '../../lib.ts'
 
 const Form = z.object({
   line1: z.string().trim().min(3).max(200),
@@ -71,6 +72,15 @@ export async function confirmAddressAction(formData: FormData): Promise<void> {
     isConfirmed: true,
   }, actor)
   await confirmAddress(order.id, address.id, actor)
+  // The payment link was withheld until the address was known (Build Spec §5.2); now it is.
+  await issuePaymentLink({
+    order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus },
+    restaurant: { id: restaurant.id, name: restaurant.name },
+    customer: { phone: customer.phone, phoneHash: customer.phoneHash },
+    lang: await currentLang(),
+    origin: await origin(),
+    actor,
+  })
   await createSession({ audience: 'customer', subjectId: customer.id })
   redirect(`/r/${slug}/order/${order.id}`)
 }

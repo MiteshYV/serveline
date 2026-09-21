@@ -19,12 +19,14 @@ import { hashPhone } from '../core/phone.ts'
 process.env.DATABASE_URL = `file://${mkdtempSync(join(tmpdir(), 'serveline-checkout-'))}`
 process.env.VENDOR_MODE = 'mock'
 process.env.PHONE_HASH_PEPPER ??= 'test-pepper' // secrets.ts derives one only under `next dev`
+// placeOrder signs the address link for a delivery the customer has not confirmed (Build Spec §5.2).
+process.env.SESSION_SECRET ??= 'test-session-secret'
 
 const { db, schema } = await import('../db/client.ts')
 const { seed } = await import('../db/seed.ts')
 const repos = await import('../db/repos/index.ts')
 const { phonePepper } = await import('../auth/secrets.ts')
-const { placeOrder, resolveCode } = await import('./place-order.ts')
+const { issuePaymentLink, placeOrder, resolveCode } = await import('./place-order.ts')
 const { mockPayments } = await import('../adapters/payments/mock.ts')
 const { mockInbox } = await import('../adapters/sms/mock.ts')
 const { payments } = await import('../adapters/payments/index.ts')
@@ -212,5 +214,81 @@ describe('placeOrder', () => {
       ...base, customer, context: { kind: 'call', fulfilment: 'delivery', callId: call.id }, items, paymentMethod: 'cod',
     })
     assert.deepEqual(noAddress, { ok: false, reason: 'address_required' })
+  })
+})
+
+// Build Spec §5.2 and Ideation §8: "Indian addresses do not survive a phone call."
+describe('a delivery to an address the customer has not confirmed', () => {
+  /** What `capture_rough_address` leaves behind: what was said, stored unconfirmed. */
+  async function roughOrder(line1: string) {
+    const { customer } = await newCustomer(`+9199000${Math.floor(Math.random() * 90000 + 10000)}`)
+    const call = (await db.insert(schema.call).values({ outletId: outlet.id, transport: 'browser', customerId: customer.id }).returning())[0]!
+    const rough = await repos.saveAddress({
+      customerId: customer.id, restaurantId: restaurant.id,
+      label: 'Spoken address', line1, area: 'Koramangala', pincode: '560095',
+      source: 'voice_rough', isConfirmed: false,
+    }, asCustomer(customer.id))
+    mockInbox.clear()
+    const result = await placeOrder({
+      ...base,
+      customer,
+      context: { kind: 'call', fulfilment: 'delivery', callId: call.id },
+      items: [{ itemId: itemByName('Masala Dosa').id, optionIds: [], qty: 1 }],
+      paymentMethod: 'upi_link',
+      addressId: rough.id,
+    })
+    assert.ok(result.ok, JSON.stringify(result))
+    return { customer, rough, orderId: result.orderId }
+  }
+
+  it('waits as address_pending, sends the link, and bills nobody', async () => {
+    const { rough, orderId } = await roughOrder('Indiranagar, near the metro')
+    const order = await repos.getOrder(orderId)
+    assert.ok(order)
+    assert.deepEqual([order.status, order.addressStatus, order.addressId], ['address_pending', 'pending', rough.id])
+    assert.deepEqual(order.events.map((e) => e.toStatus), ['received', 'address_pending'])
+
+    // The link is the only message: nobody is told the order is confirmed, and nobody is asked to
+    // pay for a delivery to an address no one has checked.
+    assert.deepEqual(mockInbox.list().map((m) => m.kind), ['address_link'])
+    assert.match(mockInbox.list()[0]!.text, new RegExp(`/r/${restaurant.slug}/address/`))
+    assert.equal(order.payments.length, 0, 'no payment link while the address is unknown')
+    assert.equal(order.paymentStatus, 'unpaid')
+  })
+
+  it('moves on and bills once the customer confirms', async () => {
+    const { customer, orderId } = await roughOrder('Indiranagar, near the park')
+    const confirmed = await repos.saveAddress({
+      customerId: customer.id, restaurantId: restaurant.id,
+      line1: '12 Cross', area: 'Koramangala', pincode: '560095', source: 'page', isConfirmed: true,
+    }, asCustomer(customer.id))
+    await repos.confirmAddress(orderId, confirmed.id, asCustomer(customer.id))
+
+    const order = await repos.getOrder(orderId)
+    assert.ok(order)
+    assert.deepEqual([order.status, order.addressStatus, order.addressId], ['confirmed', 'confirmed', confirmed.id])
+
+    mockInbox.clear()
+    const url = await issuePaymentLink({
+      order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus },
+      restaurant: { id: restaurant.id, name: restaurant.name },
+      customer: { phone: customer.phone, phoneHash: customer.phoneHash },
+      lang: 'en', origin: base.origin, actor: asCustomer(customer.id),
+    })
+    assert.ok(url)
+    assert.deepEqual(mockInbox.list().map((m) => m.kind), ['payment_link'])
+    assert.equal((await repos.getOrder(orderId))?.payments.length, 1)
+  })
+
+  it('issues nothing for cash on delivery or an order already paid', async () => {
+    const { customer, orderId } = await roughOrder('Indiranagar, by the shops')
+    const order = (await repos.getOrder(orderId))!
+    const target = {
+      restaurant: { id: restaurant.id, name: restaurant.name },
+      customer: { phone: customer.phone, phoneHash: customer.phoneHash },
+      lang: 'en' as const, origin: base.origin, actor: asCustomer(customer.id),
+    }
+    assert.equal(await issuePaymentLink({ ...target, order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: 'cod', paymentStatus: 'unpaid' } }), null)
+    assert.equal(await issuePaymentLink({ ...target, order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: 'upi_link', paymentStatus: 'paid' } }), null)
   })
 })
