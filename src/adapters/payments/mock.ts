@@ -24,7 +24,8 @@ export type MockLink = {
   url: string
   createdAt: Date
   expiresAt: Date
-  status: 'created' | 'paid'
+  /** `cancelled`: closed before it was paid, and unpayable from then on (PaymentsAdapter.cancelLink). */
+  status: 'created' | 'paid' | 'cancelled'
   /** Stable once assigned, so a retried webhook carries the same id and stays idempotent. */
   paymentId?: string
 }
@@ -59,6 +60,19 @@ export const mockPaymentsAdapter: PaymentsAdapter = {
     return { linkId, url: link.url, expiresAt: link.expiresAt }
   },
 
+  /**
+   * Razorpay's POST /v1/payment_links/{id}/cancel: only a link that has not been paid can be
+   * cancelled, and cancelling twice is not an error. A cancelled link is refused by `markPaid`
+   * below, which is what makes a superseded or converted-to-COD link unpayable rather than
+   * merely discouraged (bug hunt: superseded-payment-link-still-payable).
+   */
+  async cancelLink(linkId) {
+    const link = links.get(linkId)
+    if (!link) throw new Error(`Unknown mock payment link ${linkId}`)
+    if (link.status === 'paid') throw new Error(`Mock payment link ${linkId} is already paid; a paid link cannot be cancelled`)
+    link.status = 'cancelled'
+  },
+
   verifyWebhook: (rawBody, signature) => verifyRazorpaySignature(rawBody, signature, MOCK_WEBHOOK_SECRET),
 
   parseWebhook: parseRazorpayWebhook,
@@ -77,6 +91,9 @@ export const mockPayments = {
     const link = links.get(linkId)
     if (!link) throw new Error(`Unknown mock payment link ${linkId}`)
     const now = new Date()
+    if (link.status === 'cancelled') {
+      throw new Error(`Mock payment link ${linkId} was cancelled; a real cancelled link cannot be paid either`)
+    }
     if (link.status === 'created' && now > link.expiresAt) {
       throw new Error(`Mock payment link ${linkId} expired; a real link cannot be paid after expiry either`)
     }

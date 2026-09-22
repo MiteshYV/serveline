@@ -8,7 +8,7 @@ import { createSession } from '@/auth/session.ts'
 import { hasValidConsent, NOTICE_VERSION } from '@/core/consent.ts'
 import { checkServiceability } from '@/core/serviceability.ts'
 import { confirmAddress, getConsent, getCustomer, getOrder, recordConsent, saveAddress } from '@/db/repos/index.ts'
-import { issuePaymentLink } from '@/checkout/place-order.ts'
+import { announceConfirmedOrder } from '@/checkout/place-order.ts'
 import { clientIp, currentLang, loadRestaurant, origin, withQuery } from '../../lib.ts'
 
 const Form = z.object({
@@ -72,9 +72,14 @@ export async function confirmAddressAction(formData: FormData): Promise<void> {
     isConfirmed: true,
   }, actor)
   await confirmAddress(order.id, address.id, actor)
-  // The payment link was withheld until the address was known (Build Spec §5.2); now it is.
-  await issuePaymentLink({
-    order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus },
+  // The confirmation SMS and the payment link were both withheld until the address was known
+  // (Build Spec §5.2, §9); now it is. Before `redirect` below, which throws. A resubmitted form
+  // cannot send a second one: the guard above redirects out unless the order is address_pending.
+  await announceConfirmedOrder({
+    order: {
+      id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus, items: order.items,
+    },
     restaurant: { id: restaurant.id, name: restaurant.name },
     customer: { phone: customer.phone, phoneHash: customer.phoneHash },
     lang: await currentLang(),

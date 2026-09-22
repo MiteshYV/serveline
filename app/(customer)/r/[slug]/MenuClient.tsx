@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CartError, priceCart, type CartItemInput } from '@/core/cart.ts'
 import { formatINR, paise } from '@/core/money.ts'
+import { Band } from '@/ui/Band.tsx'
 import { Button } from '@/ui/Button.tsx'
 import { CartBar, cartReserveClass } from '@/ui/CartBar.tsx'
 import { Field } from '@/ui/Field.tsx'
@@ -31,6 +32,10 @@ const CART_ERROR_KEY: Record<CartError['code'], UiKey> = {
   invalid_qty: 'checkout.itemUnavailable',
   min_select: 'menu.required',
   max_select: 'menu.upTo',
+  // Finding negative-unit-price-cart: the menu row is mispriced, so from the diner's side this
+  // dish simply cannot be ordered — which is what `checkout.itemUnavailable` already says in all
+  // three languages. The price is the restaurant's problem, not something to explain at the till.
+  invalid_price: 'checkout.itemUnavailable',
 }
 
 const configurable = (item: ItemView) => item.variants.length > 0 || item.optionGroups.length > 0
@@ -47,10 +52,19 @@ export function MenuClient({ slug, contextKey, checkoutHref, categories, lang, d
   const [query, setQuery] = useState('')
   const [active, setActive] = useState<string | null>(null)
   const [choosing, setChoosing] = useState<ItemView | null>(null)
+  const [dropped, setDropped] = useState(false)
 
   // Read after mount: the server rendered an empty cart and hydration must match it.
   useEffect(() => {
-    setLines(prune(loadCart(key), priced))
+    const loaded = loadCart(key)
+    const kept = prune(loaded, priced)
+    setLines(kept)
+    // Finding unpriceable-cart-line-kills-cart: a dropped line is written back and said out loud.
+    // Left in storage it came back every visit; left unsaid it looked like the cart had vanished.
+    if (kept.length !== loaded.length) {
+      saveCart(key, kept)
+      setDropped(true)
+    }
   }, [key, priced])
 
   function update(next: CartItemInput[]) {
@@ -103,6 +117,20 @@ export function MenuClient({ slug, contextKey, checkoutHref, categories, lang, d
   }, [lines, priced, discountPercent])
   const count = lines.reduce((n, l) => n + l.qty, 0)
 
+  // The floor for unpriceable-cart-line-kills-cart: this page must never render rows with
+  // quantities against them and no cart bar. If pricing still refuses the whole cart, the lines
+  // it refuses go, so the diner has a working cart instead of a dead end with no way out.
+  useEffect(() => {
+    if (cart !== null || lines.length === 0) return
+    const kept = prune(lines, priced)
+    // Nothing to remove and still unpriceable would re-enter this effect for ever; leave the
+    // cart bar hidden rather than lock the page up.
+    if (kept.length === lines.length) return
+    setLines(kept)
+    saveCart(key, kept)
+    setDropped(true)
+  }, [cart, lines, priced, key])
+
   const needle = query.trim().toLowerCase()
   const shown = needle
     ? categories
@@ -125,6 +153,8 @@ export function MenuClient({ slug, contextKey, checkoutHref, categories, lang, d
 
   return (
     <div className={count > 0 ? cartReserveClass : undefined}>
+      {dropped && <Band tone="attention">{t('checkout.itemUnavailable', lang)}</Band>}
+
       <div className={styles.toolbar}>
         <Field id="menu-search" label={t('menu.search', lang)}>
           {(input) => (

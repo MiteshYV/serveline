@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { cache } from 'react'
+import { platformIdentity, staffIdentity } from './identity.ts'
 import { SESSION_TTL_SECONDS, signSession, verifySession, type Audience, type Session } from './jwt.ts'
 
 export type { Audience, Session }
@@ -38,16 +40,30 @@ export async function clearSession(audience: Audience): Promise<void> {
   ;(await cookies()).delete(COOKIE[audience])
 }
 
+/**
+ * Finding session-role-never-rechecked-against-the-row: the gates below read the live row, not the
+ * JWT's `role` and `rid` claims, so deleting or demoting a user takes effect on that user's next
+ * request instead of up to seven days later. React `cache` is per request, so the whole render —
+ * layout, page and any server action — pays for one lookup per audience, not one per call site.
+ */
+const loadStaff = cache(staffIdentity)
+const loadPlatform = cache(platformIdentity)
+
 /** Dashboard gate (Build Spec §7). Anything short of a staff session with a restaurant goes to login. */
 export async function requireStaff(): Promise<Session & { restaurantId: string; role: 'owner' | 'staff' }> {
   const s = await getSession('staff')
-  if (!s || !s.restaurantId || (s.role !== 'owner' && s.role !== 'staff')) redirect('/app/login')
-  return { ...s, restaurantId: s.restaurantId, role: s.role }
+  if (!s) redirect('/app/login')
+  const me = await loadStaff(s.subjectId)
+  // A row that has gone is a session that has gone: the same redirect as no cookie at all.
+  if (!me) redirect('/app/login')
+  return { ...s, restaurantId: me.restaurantId, role: me.role }
 }
 
 /** Agent console gate (Build Spec §8). */
 export async function requirePlatform(): Promise<Session & { role: 'agent' | 'admin' }> {
   const s = await getSession('platform')
-  if (!s || (s.role !== 'agent' && s.role !== 'admin')) redirect('/agent/login')
-  return { ...s, role: s.role }
+  if (!s) redirect('/agent/login')
+  const me = await loadPlatform(s.subjectId)
+  if (!me) redirect('/agent/login')
+  return { ...s, role: me.role }
 }

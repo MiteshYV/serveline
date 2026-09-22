@@ -1,6 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
+import { clientIpKey } from '@/auth/client-ip.ts'
 import type { PageContext } from '@/checkout/place-order.ts'
 import { getRestaurantBySlug } from '@/db/repos/index.ts'
 import type { Lang } from '@/ui/i18n.ts'
@@ -60,7 +61,15 @@ export async function origin(): Promise<string> {
   return `${proto}://${host}`
 }
 
-export async function clientIp(): Promise<string | undefined> {
-  const h = await headers()
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || undefined
+/**
+ * The per-IP rate-limit bucket for this request. Never undefined: an address that cannot be
+ * trusted shares one bucket rather than escaping the ceiling
+ * (finding otp-per-ip-limit-keyed-on-client-supplied-header; see src/auth/client-ip.ts).
+ *
+ * `x-real-ip` is gone on purpose. It is one value with no hop structure, so it is exactly as
+ * caller-supplied as the header it was standing in for, and it cannot be validated against a
+ * trusted-proxy count.
+ */
+export async function clientIp(): Promise<string> {
+  return clientIpKey((await headers()).get('x-forwarded-for'))
 }

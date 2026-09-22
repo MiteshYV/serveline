@@ -82,6 +82,12 @@ export async function saveItem(_prev: ItemFormState, form: FormData): Promise<It
       fieldErrors[`variant[${i}].delta`] = 'Enter a rupee amount; negative for a smaller portion'
       continue
     }
+    // Finding negative-unit-price-cart: a delta bigger than the base price priced the line below
+    // zero. `upsertItem` refuses the row; this says so under the input that caused it.
+    if (price !== null && price + delta < 0) {
+      fieldErrors[`variant[${i}].delta`] = 'This takes the price below zero'
+      continue
+    }
     variants.push({ id: optionalId(str(form, `variant[${i}].id`)), name, priceDeltaPaise: delta })
   }
 
@@ -96,6 +102,10 @@ export async function saveItem(_prev: ItemFormState, form: FormData): Promise<It
       const delta = parseRupees(str(form, `group[${g}].option[${o}].delta`) || '0')
       if (delta === null) {
         fieldErrors[`group[${g}].option[${o}].delta`] = 'Enter a rupee amount'
+        continue
+      }
+      if (price !== null && price + delta < 0) {
+        fieldErrors[`group[${g}].option[${o}].delta`] = 'This takes the price below zero'
         continue
       }
       options.push({ id: optionalId(str(form, `group[${g}].option[${o}].id`)), name: oname, priceDeltaPaise: delta })

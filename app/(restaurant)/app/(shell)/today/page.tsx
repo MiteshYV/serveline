@@ -1,8 +1,8 @@
-import { estimateInvoice, CALL_ALLOWANCE } from '@/core/billing.ts'
-import { istDate, istMonthStart, istMondayOf, istDateStart } from '@/core/calendar.ts'
+import { estimateInvoice } from '@/core/billing.ts'
+import { addDays, istDate, istMonthStart, istMondayOf, istDateStart } from '@/core/calendar.ts'
 import { formatINR, paise } from '@/core/money.ts'
 import {
-  channelOrderValue, countAllowanceCalls, deliveredCount, externalOrdersBetween, ordersByChannel, topCustomers, topDishes,
+  channelOrderValue, countAllowanceCalls, deliveredCount, externalWeeksBetween, ordersByChannel, topCustomers, topDishes,
 } from '@/db/repos/index.ts'
 import { currentOutlet } from '../../_lib/session.ts'
 import settings from '../settings/Settings.module.css'
@@ -17,9 +17,29 @@ const CHANNEL: Record<string, string> = {
   staff_manual: 'Entered by staff',
 }
 
-/** Build Spec §12: delivered ÷ (delivered + aggregator). Null when there is nothing to divide. */
-const share = (direct: number, external: number): number | null =>
-  direct + external === 0 ? null : Math.round((direct / (direct + external)) * 100)
+/**
+ * Build Spec §12: delivered ÷ (delivered + aggregator), over the SAME weeks on both sides.
+ *
+ * The owner types aggregator counts in whole weeks (Ideation §9); ServeLine knows its own orders to
+ * the minute. Dividing a month of direct orders by whichever weeks began inside that month compares
+ * a long period against a short one, and early in a month it printed 100% — the restaurant's best
+ * possible number, on no evidence. So the window is the weeks that have been entered, and the
+ * direct count is taken over exactly those weeks.
+ *
+ * Null when no week has been entered: there is no denominator, and a made-up one is worse than a
+ * dash and the prompt to enter it.
+ */
+const share = (direct: number, external: number, weeks: number): number | null =>
+  weeks === 0 ? null : Math.round((direct / (direct + external)) * 100)
+
+/** The instant span covered by a set of aggregator weeks: their first Monday to the last Sunday's end. */
+function weekSpan(weeks: { weekStart: string }[]): { from: Date; to: Date } | null {
+  const starts = weeks.map((w) => w.weekStart).sort()
+  const first = starts[0]
+  const last = starts[starts.length - 1]
+  if (!first || !last) return null
+  return { from: istDateStart(first), to: istDateStart(addDays(last, 7)) }
+}
 
 const pct = (n: number | null) => (n === null ? '—' : `${n}%`)
 
@@ -29,21 +49,19 @@ const pct = (n: number | null) => (n === null ? '—' : `${n}%`)
  * Admin page: English only at M1 (see i18n-dashboard.ts).
  */
 export default async function TodayPage() {
-  const { outlet } = await currentOutlet()
+  const { restaurant, outlet } = await currentOutlet()
   const now = new Date()
   const today = istDateStart(istDate(now))
   const monthStart = istMonthStart(now)
   const lastMonthStart = istMonthStart(now, 1)
   const weekStart = istDateStart(istMondayOf(now))
 
-  const [byChannelToday, byChannelMonth, deliveredMonth, deliveredLast, extMonth, extLast, customers, dishes, channelValue, aiCalls] =
+  const [byChannelToday, byChannelMonth, extMonth, extLast, customers, dishes, channelValue, aiCalls] =
     await Promise.all([
       ordersByChannel(outlet.id, today, now),
       ordersByChannel(outlet.id, monthStart, now),
-      deliveredCount(outlet.id, monthStart, now),
-      deliveredCount(outlet.id, lastMonthStart, monthStart),
-      externalOrdersBetween(outlet.id, istDate(monthStart), istDate(now)),
-      externalOrdersBetween(outlet.id, istDate(lastMonthStart), istDate(monthStart)),
+      externalWeeksBetween(outlet.id, istDate(monthStart), istDate(now)),
+      externalWeeksBetween(outlet.id, istDate(lastMonthStart), istDate(monthStart)),
       topCustomers(outlet.id, weekStart, now),
       topDishes(outlet.id, monthStart, now),
       channelOrderValue(outlet.id, monthStart, now),
@@ -51,11 +69,26 @@ export default async function TodayPage() {
       countAllowanceCalls(outlet.id, monthStart, now),
     ])
 
-  const shareMonth = share(deliveredMonth, extMonth)
-  const shareLast = share(deliveredLast, extLast)
+  // Counted over the weeks the owner entered, so the two sides of the ratio span the same days.
+  const monthSpan = weekSpan(extMonth)
+  const lastSpan = weekSpan(extLast)
+  const [directThisSpan, directLastSpan] = await Promise.all([
+    monthSpan ? deliveredCount(outlet.id, monthSpan.from, monthSpan.to) : Promise.resolve(0),
+    lastSpan ? deliveredCount(outlet.id, lastSpan.from, lastSpan.to) : Promise.resolve(0),
+  ])
+  const shareMonth = share(directThisSpan, extMonth.reduce((n, w) => n + w.orders, 0), extMonth.length)
+  const shareLast = share(directLastSpan, extLast.reduce((n, w) => n + w.orders, 0), extLast.length)
   const ordersToday = byChannelToday.reduce((n, r) => n + r.orders, 0)
   const ordersMonth = byChannelMonth.reduce((n, r) => n + r.orders, 0)
-  const invoice = estimateInvoice({ aiCalls, channelValuePaise: channelValue })
+  // Finding trial-invoice-charges-subscription: a trialing restaurant owes no subscription and
+  // has its own call allowance (Build Spec §13). `status === 'trialing'` means the period to date
+  // is entirely inside the trial, which is the only case the Spec decides.
+  const invoice = estimateInvoice({
+    aiCalls,
+    channelValuePaise: channelValue,
+    trialing: restaurant.status === 'trialing',
+    trialCallLimit: restaurant.trialCallLimit,
+  })
 
   return (
     <div className={settings.page}>
@@ -74,18 +107,24 @@ export default async function TodayPage() {
           <span className={styles.statLabel}>Direct Order Share</span>
           <span className={`${styles.statValue} num`}>{pct(shareMonth)}</span>
           <span className={styles.statNote}>
-            {shareLast === null ? 'No aggregator count for last month yet' : `Last month ${pct(shareLast)}`}
+            {shareMonth === null
+              ? 'Enter last week\u2019s aggregator counts to see this'
+              : `Over the ${extMonth.length} week${extMonth.length === 1 ? '' : 's'} you have entered${shareLast === null ? '' : ` \u00b7 last month ${pct(shareLast)}`}`}
           </span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>AI calls used</span>
-          <span className={`${styles.statValue} num`}>{aiCalls} / {CALL_ALLOWANCE}</span>
+          <span className={`${styles.statValue} num`}>{aiCalls} / {invoice.allowance}</span>
           <span className={styles.statNote}>Telephone calls the assistant answered this month; browser demo calls are not counted</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Estimated invoice to date</span>
           <span className={`${styles.statValue} num`}>{formatINR(invoice.totalPaise)}</span>
-          <span className={styles.statNote}>Subscription plus 2% on delivered direct orders</span>
+          <span className={styles.statNote}>
+            {restaurant.status === 'trialing'
+              ? '2% on delivered direct orders; the subscription is free during the trial'
+              : 'Subscription plus 2% on delivered direct orders'}
+          </span>
         </div>
       </div>
 

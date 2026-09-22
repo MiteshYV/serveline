@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { hashPhone } from '../core/phone.ts'
+import { clientIpKey } from './client-ip.ts'
 import { RateLimitedError, issueOtp, mintChallenge, verifyOtp } from './otp.ts'
 import { phonePepper } from './secrets.ts'
 
@@ -70,4 +71,25 @@ test('the sixth verify attempt for a phone in ten minutes is refused', async () 
   const { challenge } = await issueOtp(phone(8), ctx)
   for (let i = 0; i < 5; i++) await verifyOtp(phone(8), '000000', challenge)
   await assert.rejects(verifyOtp(phone(8), '000000', challenge), RateLimitedError)
+})
+
+// Finding otp-per-ip-limit-keyed-on-client-supplied-header. These two saturate shared buckets, so
+// they run last: every test above issues without an `ip` and shares the `unknown` one.
+test('a caller varying X-Forwarded-For cannot escape the per-IP ceiling', async () => {
+  // What the proxy hands us: the caller's invented prefix, then the address the proxy observed.
+  const header = (i: number) => `10.${i}.${i}.${i}, 198.51.100.4`
+  for (let i = 0; i < 60; i++) await issueOtp(phone(200 + i), { ...ctx, ip: clientIpKey(header(i), 1) })
+  await assert.rejects(issueOtp(phone(400), { ...ctx, ip: clientIpKey(header(99), 1) }), RateLimitedError)
+})
+
+test('an omitted ip shares one bucket instead of skipping the ceiling', async () => {
+  let refused = false
+  for (let i = 0; i < 61 && !refused; i++) {
+    try {
+      await issueOtp(phone(500 + i), ctx)
+    } catch (e) {
+      refused = e instanceof RateLimitedError
+    }
+  }
+  assert.ok(refused, 'no derivable address must still meet a ceiling, not skip the check')
 })

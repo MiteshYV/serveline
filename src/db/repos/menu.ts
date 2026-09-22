@@ -164,6 +164,29 @@ export type UpsertItemInput = {
   }[]
 }
 
+/**
+ * The lowest unit price this item could ever be ordered at: the base price, the cheapest variant,
+ * and every negative option delta a diner may still choose within each group's maximum.
+ *
+ * Finding negative-unit-price-cart. `core/cart` refuses a line that prices below zero, so a row
+ * saved in that state is a dish nobody can order on any channel; before that guard existed it was
+ * a negative order total — a negative bill on the kitchen ticket, no UPI link because
+ * `totalPaise > 0` is false, and a *reduction* of the Build Spec §13 fee. This repository is the
+ * one choke point the dashboard form, the agent console and any future caller all pass through.
+ */
+function lowestUnitPrice(
+  pricePaise: number,
+  variants: { priceDeltaPaise: number }[],
+  groups: { maxSelect?: number; options: { priceDeltaPaise: number }[] }[],
+): number {
+  const cheapestVariant = variants.length === 0 ? 0 : Math.min(...variants.map((v) => v.priceDeltaPaise))
+  const cheapestOptions = groups.reduce((sum, g) => {
+    const discounts = g.options.map((o) => o.priceDeltaPaise).filter((d) => d < 0).sort((a, b) => a - b)
+    return sum + discounts.slice(0, g.maxSelect ?? 1).reduce((n, d) => n + d, 0)
+  }, 0)
+  return pricePaise + cheapestVariant + cheapestOptions
+}
+
 export async function upsertItem(input: UpsertItemInput, actor: Actor): Promise<PublishedItem> {
   return db.transaction(async (tx) => {
     // `menu_id` is derived from the category so the two keys the row carries cannot disagree.
@@ -172,6 +195,19 @@ export async function upsertItem(input: UpsertItemInput, actor: Actor): Promise<
 
     const before = input.id ? await loadItem(tx, input.id) : null
     if (input.id && !before) throw new Error(`No menu item ${input.id}`)
+
+    // Children the caller left out keep their stored rows, so the floor is measured against what
+    // the item will actually have after this write, not against what was posted.
+    const floor = lowestUnitPrice(
+      input.pricePaise,
+      input.variants ?? before?.variants ?? [],
+      input.optionGroups ?? before?.optionGroups ?? [],
+    )
+    if (floor < 0) {
+      throw new Error(
+        `"${input.name}" can price at ${floor} paise: the base price is below the variant and option deltas that can be chosen with it`,
+      )
+    }
 
     const fields = {
       menuId: category.menuId,

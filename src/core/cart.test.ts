@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { CartError, priceCart, type CartErrorCode, type PricedMenuItem } from './cart.ts'
+import { CartError, priceCart, priceableLines, type CartErrorCode, type PricedMenuItem } from './cart.ts'
 import { paise } from './money.ts'
 
 // A slice of the seeded Bangalore menu. Prices are paise: ₹120 is 12000.
@@ -198,6 +198,64 @@ describe('priceCart validation', () => {
     rejects('invalid_qty', () => priceCart([{ itemId: 'itm_dosa', optionIds: [], qty: 1.5 }], menu))
   })
 
+  // Finding negative-unit-price-cart. The owner drops a base price for a promotion while an old
+  // "Half −₹150" variant stays, and the line — and the order total — goes below zero.
+  it('refuses a variant delta larger than the base price', () => {
+    const underpriced: PricedMenuItem = {
+      id: 'itm_promo',
+      name: 'Promo Biryani',
+      pricePaise: paise(10000),
+      variants: [{ id: 'var_half', name: 'Half', priceDeltaPaise: paise(-15000) }],
+      optionGroups: [],
+    }
+    rejects('invalid_price', () =>
+      priceCart([{ itemId: 'itm_promo', variantId: 'var_half', optionIds: [], qty: 1 }], [underpriced]))
+  })
+
+  it('refuses when the option deltas alone take the line below zero', () => {
+    const underpriced: PricedMenuItem = {
+      id: 'itm_combo',
+      name: 'Light Combo',
+      pricePaise: paise(4000),
+      variants: [],
+      optionGroups: [{
+        id: 'grp_drop',
+        name: 'Leave out',
+        minSelect: 0,
+        maxSelect: 2,
+        options: [
+          { id: 'opt_no_rice', name: 'No rice', priceDeltaPaise: paise(-2500) },
+          { id: 'opt_no_curd', name: 'No curd', priceDeltaPaise: paise(-2500) },
+        ],
+      }],
+    }
+    rejects('invalid_price', () =>
+      priceCart([{ itemId: 'itm_combo', optionIds: ['opt_no_rice', 'opt_no_curd'], qty: 1 }], [underpriced]))
+  })
+
+  // The quieter half of the same finding: a negative subtotal made applyPercentDiscount throw a
+  // RangeError, which is not a CartError and escaped placeOrder into "Something went wrong".
+  it('refuses the negative line before a discount can throw a RangeError', () => {
+    const underpriced: PricedMenuItem = {
+      id: 'itm_promo',
+      name: 'Promo Biryani',
+      pricePaise: paise(10000),
+      variants: [{ id: 'var_half', name: 'Half', priceDeltaPaise: paise(-15000) }],
+      optionGroups: [],
+    }
+    rejects('invalid_price', () =>
+      priceCart(
+        [{ itemId: 'itm_promo', variantId: 'var_half', optionIds: [], qty: 1 }],
+        [underpriced],
+        { percent: 10 },
+      ))
+  })
+
+  it('still allows a negative delta that leaves the line at or above zero', () => {
+    const cart = priceCart([{ itemId: 'itm_biryani', variantId: 'var_half', optionIds: [], qty: 1 }], menu)
+    assert.equal(cart.lines[0]?.unitPricePaise, 16000)
+  })
+
   it('carries a code the voice service and the page can both act on', () => {
     try {
       priceCart([{ itemId: 'itm_ghost', optionIds: [], qty: 1 }], menu)
@@ -207,5 +265,77 @@ describe('priceCart validation', () => {
       assert.equal(thrown.code, 'unknown_item')
       assert.match(thrown.message, /itm_ghost/)
     }
+  })
+})
+
+// Finding unpriceable-cart-line-kills-cart: the repro was a saved cart line whose ids all still
+// resolve but which an ordinary menu edit has made unpriceable. One such line used to throw for
+// the whole cart; it must be dropped and the rest must still price.
+describe('priceableLines', () => {
+  it('drops a line that violates a group minimum and keeps the rest', () => {
+    // The thali's Bread group is minSelect 1; this saved line chose nothing, as it could before
+    // the owner made the group required.
+    const kept = priceableLines(
+      [
+        { itemId: 'itm_thali', optionIds: [], qty: 1 },
+        { itemId: 'itm_dosa', optionIds: [], qty: 2 },
+      ],
+      menu,
+    )
+
+    assert.deepEqual(kept, [{ itemId: 'itm_dosa', optionIds: [], qty: 2 }])
+    assert.equal(priceCart(kept, menu).totalPaise, 24000)
+  })
+
+  it('drops a line whose group maximum was lowered under it', () => {
+    const lowered: PricedMenuItem = {
+      ...thali,
+      optionGroups: thali.optionGroups.map((g) =>
+        g.id === 'grp_extras' ? { ...g, maxSelect: 1 } : g),
+    }
+    const kept = priceableLines(
+      [{ itemId: 'itm_thali', optionIds: ['opt_roti', 'opt_curd', 'opt_papad'], qty: 1 }],
+      [lowered],
+    )
+
+    assert.deepEqual(kept, [])
+  })
+
+  it('drops a line the menu now prices below zero', () => {
+    const underpriced: PricedMenuItem = {
+      id: 'itm_promo',
+      name: 'Promo Biryani',
+      pricePaise: paise(10000),
+      variants: [{ id: 'var_half', name: 'Half', priceDeltaPaise: paise(-15000) }],
+      optionGroups: [],
+    }
+
+    assert.deepEqual(
+      priceableLines([{ itemId: 'itm_promo', variantId: 'var_half', optionIds: [], qty: 1 }], [underpriced]),
+      [],
+    )
+  })
+
+  it('drops lines whose ids no longer resolve, as the id check did', () => {
+    assert.deepEqual(
+      priceableLines(
+        [
+          { itemId: 'itm_ghost', optionIds: [], qty: 1 },
+          { itemId: 'itm_biryani', variantId: 'var_family', optionIds: [], qty: 1 },
+          { itemId: 'itm_dosa', optionIds: [], qty: 0 },
+        ],
+        menu,
+      ),
+      [],
+    )
+  })
+
+  it('leaves a cart every line of which still prices', () => {
+    const lines = [
+      { itemId: 'itm_dosa', optionIds: [], qty: 1 },
+      { itemId: 'itm_thali', optionIds: ['opt_naan'], qty: 1 },
+    ]
+
+    assert.deepEqual(priceableLines(lines, menu), lines)
   })
 })

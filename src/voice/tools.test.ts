@@ -123,7 +123,7 @@ describe('search_menu', () => {
     assert.deepEqual([items[0]?.priceRupees, items[0]?.pricePaise], ['120', 12000])
     assert.ok(items.length <= 6)
     assert.ok(items.every((i) => /dosa/i.test(i.name)), 'every match is a dosa')
-    assert.ok(s.seenItemIds.has(masalaDosa.id) && s.searchResults.has(masalaDosa.id))
+    assert.ok(s.seenItemIds.has(masalaDosa.id), 'what was shown is recorded as an id, never as a price')
     assert.ok(!s.seenItemIds.has(biryani.id))
 
     const found = data<{ items: Item[] }>(await runTool('search_menu', { query: 'chicken biriyani', language: 'hi' }, s, asAnita))
@@ -268,6 +268,51 @@ describe('place_order', () => {
     assert.equal(mockInbox.list()[0]?.kind, 'order_confirm')
   })
 
+  // place-order-not-idempotent-per-call / voice-place-order-not-idempotent: one call, one order.
+  // Without the guard the model can place the same cart twice — two tickets in the kitchen, two
+  // live payment links for the same food, and a `call` row that links only the second.
+  it('refuses a second placement in the same call and leaves exactly one order', async () => {
+    const s = await newCall()
+    await runTool('search_menu', { query: 'masala dosa', language: 'en' }, s, asAnita)
+    await runTool('add_to_cart', { item_id: masalaDosa.id, qty: 1 }, s, asAnita)
+    const first = data<{ orderId: string }>(await runTool('place_order', { fulfilment: 'pickup', payment_method: 'cod' }, s, asAnita))
+
+    const again = await runTool('place_order', { fulfilment: 'pickup', payment_method: 'cod' }, s, asAnita)
+    assert.deepEqual(again, { ok: false, reason: 'order_already_placed', detail: { orderId: first.orderId } })
+    assert.deepEqual(s.cart, [], 'the placed cart is gone, so nothing stale can be re-placed or parked')
+    const orders = await db.select().from(schema.order).where(eq(schema.order.callId, s.callId))
+    assert.deepEqual(orders.map((o) => o.id), [first.orderId], 'one call, one order')
+  })
+
+  // read-back-total-is-not-the-charged-total: an ordinary counter price edit during a live call
+  // must move the read-back too, because the read-back is what the caller says yes to (§5.2).
+  it('reads back the live price, not the price search_menu returned', async () => {
+    const dearer = await item('Ghee Roast', 15000)
+    const s = await newCall()
+    await runTool('search_menu', { query: 'ghee roast', language: 'en' }, s, asAnita)
+    assert.equal(data<Summary>(await runTool('add_to_cart', { item_id: dearer.id, qty: 2 }, s, asAnita)).totalPaise, 30000)
+
+    // The counter edits the price mid-call; src/db/repos/menu.ts says the edit is live at once.
+    await db.update(schema.menuItem).set({ pricePaise: 25000 }).where(eq(schema.menuItem.id, dearer.id))
+    assert.equal(data<Summary>(await runTool('get_cart', {}, s, asAnita)).totalPaise, 50000, 'the read-back followed the menu')
+
+    const placed = data<{ orderId: string; totalPaise: number }>(
+      await runTool('place_order', { fulfilment: 'pickup', payment_method: 'cod' }, s, asAnita),
+    )
+    assert.equal(placed.totalPaise, 50000, 'the cart the caller heard is the cart they are charged')
+  })
+
+  // The other side of pricing against the live menu: a dish withdrawn mid-call is a refusal the
+  // model can explain, not a CartError thrown through the loop (M2 design "Error handling").
+  it('refuses the cart when a line has left the menu, instead of throwing', async () => {
+    const fleeting = await item('Neer Dosa', 8000)
+    const s = await newCall()
+    await runTool('search_menu', { query: 'neer dosa', language: 'en' }, s, asAnita)
+    await runTool('add_to_cart', { item_id: fleeting.id, qty: 1 }, s, asAnita)
+    await db.update(schema.menuItem).set({ isAvailable: false }).where(eq(schema.menuItem.id, fleeting.id))
+    assert.deepEqual(await runTool('get_cart', {}, s, asAnita), { ok: false, reason: 'unknown_item' })
+  })
+
   it('delivery by UPI link to a saved address sends the payment link', async () => {
     const s = await newCall()
     const [coffee] = data<{ items: Item[] }>(await runTool('search_menu', { query: 'filter coffee', language: 'en' }, s, asAnita)).items
@@ -317,8 +362,17 @@ describe('record_consent (Build Spec §10, ADR 0005)', () => {
     assert.deepEqual(await runTool('record_consent', { agreed: true }, s, asBala), { ok: false, reason: 'notice_not_read' })
     assert.equal(await repos.getConsent(bala.id, restaurant.id), null)
 
-    // The loop sets this when the reply carries the notice word for word.
-    s.noticeRead = true
+    // The loop stamps the turn the reply carried the notice in; the answer comes in a later turn.
+    s.noticeReadAtTurn = 1
+    s.turnCount = 1
+    assert.deepEqual(
+      await runTool('record_consent', { agreed: true }, s, asBala),
+      { ok: false, reason: 'notice_not_read' },
+      'the notice and the answer cannot be the same turn (consent-recorded-without-an-answer)',
+    )
+    assert.equal(await repos.getConsent(bala.id, restaurant.id), null)
+
+    s.turnCount = 2
     assert.deepEqual(await runTool('record_consent', { agreed: true }, s, asBala), { ok: true, data: { agreed: true } })
     const consent = await repos.getConsent(bala.id, restaurant.id)
     assert.ok(consent)
@@ -331,7 +385,8 @@ describe('record_consent (Build Spec §10, ADR 0005)', () => {
 
   it('records nothing for a no, and needs an identity', async () => {
     const s = await newCall(bala.id)
-    s.noticeRead = true
+    s.noticeReadAtTurn = 1
+    s.turnCount = 2
     assert.deepEqual(await runTool('record_consent', { agreed: false }, s, asBala), { ok: true, data: { agreed: false } })
     assert.deepEqual(await runTool('record_consent', { agreed: true }, s, anonymous), { ok: false, reason: 'customer_required' })
   })

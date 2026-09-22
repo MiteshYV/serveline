@@ -114,7 +114,14 @@ export function ManualOrder({ lang, categories, priced, codEnabled }: Props) {
       priceCart([input], priced)
     } catch (e) {
       if (e instanceof CartError) {
-        setChooser({ ...chooser, error: e.code === 'min_select' ? td('manual.required', lang) : t('action.retry', lang) })
+        // Finding negative-unit-price-cart: `invalid_price` is the menu's fault, not the counter
+        // staff's, and "Try again" would loop for ever — say that the item needs fixing instead.
+        const message = e.code === 'min_select'
+          ? td('manual.required', lang)
+          : e.code === 'invalid_price'
+            ? td('manual.failed', lang)
+            : t('action.retry', lang)
+        setChooser({ ...chooser, error: message })
         return
       }
       throw e

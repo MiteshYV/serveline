@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
-import { payments } from './index.ts'
+import { closeLinks, payments } from './index.ts'
 import { mockPayments, mockPaymentsAdapter as adapter } from './mock.ts'
 
 afterEach(() => mockPayments.clear())
@@ -73,4 +73,36 @@ test('VENDOR_MODE=live fails loudly instead of falling back to the mock', () => 
     if (saved === undefined) delete process.env.VENDOR_MODE
     else process.env.VENDOR_MODE = saved
   }
+})
+
+test('a cancelled link cannot be paid, and cancelling is idempotent', async () => {
+  // The gateway half of the double-charge fix: closing our own `payment` row does not stop a
+  // capture, cancelling the link does (bug hunt: superseded-payment-link-still-payable,
+  // cod-conversion-leaves-upi-link-payable).
+  const { linkId } = await adapter.createLink(input)
+  await adapter.cancelLink(linkId)
+  assert.equal(mockPayments.get(linkId)?.status, 'cancelled')
+  assert.throws(() => mockPayments.markPaid(linkId), /cancelled/)
+
+  await adapter.cancelLink(linkId) // a second close is not an error
+  assert.equal(mockPayments.get(linkId)?.status, 'cancelled')
+})
+
+test('cancelLink refuses an unknown link and one the gateway has already captured', async () => {
+  await assert.rejects(adapter.cancelLink('plink_unknown'), /Unknown/)
+  const { linkId } = await adapter.createLink(input)
+  mockPayments.markPaid(linkId)
+  await assert.rejects(adapter.cancelLink(linkId), /already paid/)
+})
+
+test('closeLinks swallows what cannot be cancelled and closes the rest', async () => {
+  // Callers close links from actions that must not fail because a link is gone: a resend, a COD
+  // conversion, a cancellation.
+  const { linkId } = await adapter.createLink(input)
+  const paid = await adapter.createLink(input)
+  mockPayments.markPaid(paid.linkId)
+
+  await closeLinks(['plink_unknown', paid.linkId, linkId])
+  assert.equal(mockPayments.get(linkId)?.status, 'cancelled')
+  assert.equal(mockPayments.get(paid.linkId)?.status, 'paid')
 })

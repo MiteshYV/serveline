@@ -174,11 +174,18 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
     })),
   }))
 
+  // A code the restaurant has already refused this customer is spent: keeping `c=` in the links
+  // means every way back — the menu, "change address", the retry — resolves and refuses it again,
+  // and the order can never be placed (finding refused-code-blocks-order). Drop it, keep the
+  // context. ConfirmStep still receives `code` so the customer is told why there is no discount.
+  const spent = code !== null && !code.ok
+  const liveQs = spent ? contextQuery(ctx.kind === 'delivery' ? { kind: 'delivery' } : ctx) : qs
+
   return (
     <Step n={3} lang={lang} title={t('checkout.confirm', lang)}>
       <ConfirmStep
         slug={slug}
-        qs={qs}
+        qs={liveQs}
         contextKey={ctx.kind === 'table' ? `table:${ctx.tableNo}` : 'delivery'}
         lang={lang}
         ctx={ctx}
@@ -186,8 +193,8 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
         code={code}
         address={address ? { id: address.id, line1: address.line1, landmark: address.landmark, area: address.area, pincode: address.pincode } : null}
         codEnabled={outlet.codEnabled}
-        menuHref={menuHref}
-        changeAddressHref={withQuery(`/r/${slug}/checkout`, qs)}
+        menuHref={spent ? withQuery(`/r/${slug}`, liveQs) : menuHref}
+        changeAddressHref={withQuery(`/r/${slug}/checkout`, liveQs)}
       />
     </Step>
   )

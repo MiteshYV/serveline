@@ -26,7 +26,7 @@ const { db, schema } = await import('../db/client.ts')
 const { seed } = await import('../db/seed.ts')
 const repos = await import('../db/repos/index.ts')
 const { phonePepper } = await import('../auth/secrets.ts')
-const { issuePaymentLink, placeOrder, resolveCode } = await import('./place-order.ts')
+const { announceConfirmedOrder, issuePaymentLink, placeOrder, resolveCode } = await import('./place-order.ts')
 const { mockPayments } = await import('../adapters/payments/mock.ts')
 const { mockInbox } = await import('../adapters/sms/mock.ts')
 const { payments } = await import('../adapters/payments/index.ts')
@@ -132,6 +132,54 @@ describe('placeOrder', () => {
     assert.deepEqual(again, { ok: true, orderId: order.id, alreadyPaid: true })
   })
 
+  it('names the payment mode without claiming an unpaid order has been paid', async () => {
+    // Build Spec §9 asks for the payment mode. The order is awaiting_payment when this goes out,
+    // so the confirmation must not assert a payment (bug hunt:
+    // order-confirm-sms-claims-unpaid-order-is-paid).
+    const { customer, address } = await newCustomer('+919900000106')
+    mockInbox.clear()
+    const result = await placeOrder({
+      ...base, customer, context: { kind: 'delivery' },
+      items: [{ itemId: itemByName('Idli Vada').id, optionIds: [], qty: 1 }],
+      paymentMethod: 'upi_link', addressId: address.id,
+    })
+    assert.ok(result.ok, JSON.stringify(result))
+    assert.equal((await repos.getOrder(result.orderId))!.paymentStatus, 'awaiting')
+
+    const confirm = mockInbox.list().find((m) => m.kind === 'order_confirm')
+    assert.ok(confirm, 'the order is confirmed to the customer')
+    assert.doesNotMatch(confirm.text, /paid by UPI/)
+    assert.match(confirm.text, /pay by UPI link/)
+  })
+
+  it('closes the link it replaces at the gateway, so only the newest is payable', async () => {
+    // The customer holding two SMSes could pay both and be charged twice; our own payment row
+    // going `unpaid` never stopped that (bug hunt: superseded-payment-link-still-payable).
+    const { customer, address } = await newCustomer('+919900000107')
+    const placed = await placeOrder({
+      ...base, customer, context: { kind: 'delivery' },
+      items: [{ itemId: itemByName('Idli Vada').id, optionIds: [], qty: 1 }],
+      paymentMethod: 'upi_link', addressId: address.id,
+    })
+    assert.ok(placed.ok, JSON.stringify(placed))
+    const first = placed.paymentUrl!.slice('/mock/pay/'.length)
+
+    const order = (await repos.getOrder(placed.orderId))!
+    const url = await issuePaymentLink({
+      order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus },
+      restaurant: { id: restaurant.id, name: restaurant.name },
+      customer: { phone: customer.phone, phoneHash: customer.phoneHash },
+      lang: 'en', origin: base.origin, actor: asCustomer(customer.id),
+    })
+    assert.ok(url && !url.endsWith(first))
+
+    assert.equal(mockPayments.get(first)?.status, 'cancelled', 'the old link is dead at the gateway')
+    assert.throws(() => mockPayments.markPaid(first), /cancelled/)
+    const after = (await repos.getOrder(order.id))!
+    assert.equal(after.payments.find((p) => p.linkId === first)?.status, 'unpaid')
+    assert.equal(after.payments.filter((p) => p.status === 'awaiting').length, 1)
+  })
+
   it('refuses a second redemption by the same phone, across batches, and says why', async () => {
     const { customer, address } = await newCustomer('+919900000103')
     const first = await placeOrder({
@@ -220,7 +268,7 @@ describe('placeOrder', () => {
 // Build Spec §5.2 and Ideation §8: "Indian addresses do not survive a phone call."
 describe('a delivery to an address the customer has not confirmed', () => {
   /** What `capture_rough_address` leaves behind: what was said, stored unconfirmed. */
-  async function roughOrder(line1: string) {
+  async function roughOrder(line1: string, paymentMethod: 'upi_link' | 'cod' = 'upi_link') {
     const { customer } = await newCustomer(`+9199000${Math.floor(Math.random() * 90000 + 10000)}`)
     const call = (await db.insert(schema.call).values({ outletId: outlet.id, transport: 'browser', customerId: customer.id }).returning())[0]!
     const rough = await repos.saveAddress({
@@ -234,7 +282,7 @@ describe('a delivery to an address the customer has not confirmed', () => {
       customer,
       context: { kind: 'call', fulfilment: 'delivery', callId: call.id },
       items: [{ itemId: itemByName('Masala Dosa').id, optionIds: [], qty: 1 }],
-      paymentMethod: 'upi_link',
+      paymentMethod,
       addressId: rough.id,
     })
     assert.ok(result.ok, JSON.stringify(result))
@@ -256,28 +304,55 @@ describe('a delivery to an address the customer has not confirmed', () => {
     assert.equal(order.paymentStatus, 'unpaid')
   })
 
-  it('moves on and bills once the customer confirms', async () => {
-    const { customer, orderId } = await roughOrder('Indiranagar, near the park')
+  /** What the address page does once the customer has confirmed, and the only caller of it. */
+  async function confirmAndAnnounce(customerRow: { id: string; phone: string; phoneHash: string }, orderId: string) {
     const confirmed = await repos.saveAddress({
-      customerId: customer.id, restaurantId: restaurant.id,
+      customerId: customerRow.id, restaurantId: restaurant.id,
       line1: '12 Cross', area: 'Koramangala', pincode: '560095', source: 'page', isConfirmed: true,
-    }, asCustomer(customer.id))
-    await repos.confirmAddress(orderId, confirmed.id, asCustomer(customer.id))
+    }, asCustomer(customerRow.id))
+    await repos.confirmAddress(orderId, confirmed.id, asCustomer(customerRow.id))
+    const order = (await repos.getOrder(orderId))!
+    mockInbox.clear()
+    const url = await announceConfirmedOrder({
+      order: {
+        id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus, items: order.items,
+      },
+      restaurant: { id: restaurant.id, name: restaurant.name },
+      customer: { phone: customerRow.phone, phoneHash: customerRow.phoneHash },
+      lang: 'en', origin: base.origin, actor: asCustomer(customerRow.id),
+    })
+    return { confirmed, order, url }
+  }
+
+  it('moves on, confirms the order and bills once the customer confirms', async () => {
+    const { customer, orderId } = await roughOrder('Indiranagar, near the park')
+    const { confirmed, url } = await confirmAndAnnounce(customer, orderId)
 
     const order = await repos.getOrder(orderId)
     assert.ok(order)
     assert.deepEqual([order.status, order.addressStatus, order.addressId], ['confirmed', 'confirmed', confirmed.id])
-
-    mockInbox.clear()
-    const url = await issuePaymentLink({
-      order: { id: order.id, totalPaise: order.totalPaise, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus },
-      restaurant: { id: restaurant.id, name: restaurant.name },
-      customer: { phone: customer.phone, phoneHash: customer.phoneHash },
-      lang: 'en', origin: base.origin, actor: asCustomer(customer.id),
-    })
     assert.ok(url)
-    assert.deepEqual(mockInbox.list().map((m) => m.kind), ['payment_link'])
-    assert.equal((await repos.getOrder(orderId))?.payments.length, 1)
+    // Newest first: the confirmation withheld at placement, then the link withheld with it.
+    assert.deepEqual(mockInbox.list().map((m) => m.kind), ['payment_link', 'order_confirm'])
+    assert.equal(order.payments.length, 1)
+  })
+
+  it('confirms a cash order in writing — its only message after the address link', async () => {
+    // A caller who cannot read a menu ordered by phone, paying cash. Skipping order_confirm at
+    // placement left them with no record of items, total or payment mode at all (bug hunt:
+    // address-pending-order-never-confirmed-by-sms).
+    const { customer, orderId } = await roughOrder('Indiranagar, by the temple', 'cod')
+    const { url } = await confirmAndAnnounce(customer, orderId)
+    assert.equal(url, null, 'cash on delivery is not billed by link')
+
+    const [confirm] = mockInbox.list()
+    assert.equal(mockInbox.list().length, 1)
+    assert.equal(confirm?.kind, 'order_confirm')
+    assert.match(confirm?.text ?? '', /1x Masala Dosa/)
+    assert.match(confirm?.text ?? '', /cash on delivery/)
+    const order = (await repos.getOrder(orderId))!
+    assert.match(confirm?.text ?? '', new RegExp(`Rs ${(order.totalPaise / 100).toFixed(0)}`))
   })
 
   it('issues nothing for cash on delivery or an order already paid', async () => {

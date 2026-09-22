@@ -79,6 +79,13 @@ export type CartErrorCode =
   | 'min_select'
   | 'max_select'
   | 'invalid_qty'
+  /**
+   * The menu row prices this line below zero (a variant or option delta larger than the base
+   * price). Finding negative-unit-price-cart: a negative line is a negative order total, which
+   * means a negative bill on the kitchen ticket, no UPI link, and a *reduction* of the 2% fee in
+   * Build Spec §13. Refused here so no channel can carry it.
+   */
+  | 'invalid_price'
 
 /**
  * One class, one code union — not a hierarchy. `code` is the machine-readable half: the voice
@@ -119,6 +126,28 @@ export function priceCart(
   // Derived rather than computed separately, so `discount + total === subtotal` cannot drift
   // from however `applyPercentDiscount` chooses to round.
   return { lines, subtotalPaise, discountPaise: paise(subtotalPaise - totalPaise), totalPaise }
+}
+
+/**
+ * The lines of `inputs` that `priceCart` will still accept against today's `menu`, in order.
+ *
+ * Finding unpriceable-cart-line-kills-cart: a cart saved in a browser outlives the menu it was
+ * built from, and checking only that its ids still resolve is not enough — an ordinary dashboard
+ * edit (a group made required, a maximum lowered, a base price dropped below a delta) leaves a
+ * line whose ids are all real and which `priceCart` nevertheless refuses. One such line threw for
+ * the whole cart, and both customer surfaces swallowed that into "your cart is empty" while the
+ * cart stayed in storage. "Can this line still be priced" has exactly one answer, and it is this.
+ */
+export function priceableLines(inputs: CartItemInput[], menu: PricedMenuItem[]): CartItemInput[] {
+  return inputs.filter((input) => {
+    try {
+      priceCart([input], menu)
+      return true
+    } catch (error) {
+      if (error instanceof CartError) return false
+      throw error
+    }
+  })
 }
 
 function priceLine(
@@ -199,6 +228,16 @@ function priceLine(
         `${group.name} on ${item.name} allows at most ${group.maxSelect} choice(s), got ${chosen}`,
       )
     }
+  }
+
+  // After both deltas, because either one alone can take the line below zero. `money.ts` blesses a
+  // negative *delta* (a half plate), never a negative price: a negative subtotal also makes
+  // `applyPercentDiscount` throw a RangeError, which is not a CartError and escapes every caller.
+  if (unitPrice < 0) {
+    throw new CartError(
+      'invalid_price',
+      `${item.name} prices below zero (${unitPrice} paise) with the chosen variant and options`,
+    )
   }
 
   return {

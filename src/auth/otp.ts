@@ -2,6 +2,7 @@ import { createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 import { vendorMode } from '../adapters/mode.ts'
 import { sms, type SmsLanguage } from '../adapters/sms/index.ts'
 import { hashPhone } from '../core/phone.ts'
+import { UNKNOWN_IP } from './client-ip.ts'
 import { createLimiter } from './rate-limit.ts'
 import { phonePepper, sessionSecret } from './secrets.ts'
 
@@ -28,6 +29,10 @@ const phoneLimiter = createLimiter(5, 10 * 60 * 1000)
  * neighbourhood behind one, so five would refuse the sixth diner at a busy dinner. Sixty per ten
  * minutes still caps one address at an SMS every ten seconds; the per-phone limit is what stops
  * a brute force.
+ *
+ * `ctx.ip` must be a key derived by `clientIpKey` (src/auth/client-ip.ts), not a raw
+ * `X-Forwarded-For` element — see that file for what this ceiling is and is not worth behind a
+ * proxy, and what it is worth without one (finding otp-per-ip-limit-keyed-on-client-supplied-header).
  */
 const ipLimiter = createLimiter(60, 10 * 60 * 1000)
 
@@ -48,7 +53,7 @@ export function mintChallenge(phoneHash: string, code: string, now = Date.now())
 /**
  * Sends a six-digit code by SMS and returns the challenge to verify it against. Throws
  * `RateLimitedError` on the sixth request in ten minutes for the phone, or the sixty-first for
- * `ip` when given.
+ * `ip` — where an omitted `ip` is one shared bucket, not an exemption.
  * `devCode` is returned only under `VENDOR_MODE=mock`, so a demo can log in without a handset.
  * The code is never logged.
  *
@@ -62,7 +67,9 @@ export async function issueOtp(
 ): Promise<{ challenge: string; devCode?: string }> {
   const phoneHash = hashPhone(phoneE164, phonePepper())
   if (!phoneLimiter.hit(`issue:${phoneHash}`)) throw new RateLimitedError()
-  if (ctx.ip !== undefined && !ipLimiter.hit(ctx.ip)) throw new RateLimitedError()
+  // Fail closed: a caller that supplies no key shares one global bucket rather than skipping the
+  // ceiling, which is what the old `ctx.ip !== undefined &&` short-circuit did.
+  if (!ipLimiter.hit(ctx.ip ?? UNKNOWN_IP)) throw new RateLimitedError()
 
   const code = randomInt(0, 1_000_000).toString().padStart(6, '0')
   const challenge = mintChallenge(phoneHash, code)

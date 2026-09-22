@@ -30,7 +30,9 @@ export default async function MockPayPage({ params }: { params: Promise<{ linkId
   const lang = isLang(l) ? l : 'en'
   const statusHref = `/r/${restaurant.slug}/order/${order.id}`
   const amount = formatINR(paise(link.amountPaise))
-  const expired = link.status === 'created' && Date.now() > link.expiresAt.getTime()
+  // A superseded or converted-to-cash link is closed at the gateway (finding
+  // superseded-payment-link-still-payable); it must not offer a pay button that then throws.
+  const expired = link.status === 'cancelled' || (link.status === 'created' && Date.now() > link.expiresAt.getTime())
 
   return (
     <div className={styles.page} data-density="comfort" lang={lang}>

@@ -15,7 +15,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, afterEach, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { eq } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/pglite/migrator'
+import type { LlmResponse } from '../adapters/llm/index.ts'
 import { NOTICE_VERSION } from '../core/consent.ts'
 import { hashPhone } from '../core/phone.ts'
 
@@ -29,7 +31,10 @@ const { db, schema } = await import('../db/client.ts')
 const repos = await import('../db/repos/index.ts')
 const { SYSTEM } = await import('../db/repos/_actor.ts')
 const { mockInbox } = await import('../adapters/sms/mock.ts')
+const { mockLlmAdapter } = await import('../adapters/llm/mock.ts')
+const { toAnthropicMessages } = await import('../adapters/llm/anthropic.ts')
 const { getSession } = await import('./session.ts')
+const { spokenNotice } = await import('./notice.ts')
 const { startCall, takeTurn, endCall } = await import('./loop.ts')
 
 await migrate(db, { migrationsFolder: fileURLToPath(new URL('../db/migrations', import.meta.url)) })
@@ -97,6 +102,25 @@ await repos.upsertCustomerRestaurant({
 const names = (r: Awaited<ReturnType<typeof takeTurn>>) => r.toolCalls.map((c) => c.name)
 const okCalls = (r: Awaited<ReturnType<typeof takeTurn>>, name: string) =>
   r.toolCalls.filter((c) => c.name === name && (c.result as { ok: boolean }).ok)
+
+/**
+ * The scripted model, scripted exactly: one canned response per model call, the last repeating.
+ * For the orderings mock.ts's policy never produces on its own — a tool call batched with the
+ * notice, a tool call after a closing signal, a turn that never stops asking for tools.
+ */
+async function withScript<T>(script: Partial<LlmResponse>[], run: () => Promise<T>): Promise<T> {
+  const scripted = mockLlmAdapter.complete
+  let i = 0
+  mockLlmAdapter.complete = async () => ({
+    text: null, toolCalls: [], usage: { tokensIn: 1, tokensOut: 1 }, provider: 'mock', model: 'scripted-test',
+    ...script[Math.min(i++, script.length - 1)],
+  })
+  try {
+    return await run()
+  } finally {
+    mockLlmAdapter.complete = scripted
+  }
+}
 
 const LLM_VARS = ['LLM_PRIMARY_PROVIDER', 'LLM_SECONDARY_PROVIDER'] as const
 afterEach(() => {
@@ -191,7 +215,11 @@ describe('a three-item Hindi order with a variant (acceptance 1, 5)', () => {
     assert.deepEqual(recorded.map((c) => c.name), ['search_menu', 'add_to_cart'])
     assert.ok(recorded.every((c) => typeof c.ms === 'number' && c.result !== undefined))
     assert.ok(call.cost && call.cost.tokensIn > 0 && call.cost.tokensOut > 0, 'a cost row with the usage')
-    assert.deepEqual([call.cost.llmPaise, call.cost.totalPaise], [0, 0], 'the mock is priced at zero')
+    assert.equal(call.cost.llmPaise, 0, 'the mock model is priced at zero')
+    // Build Spec §4 `call_cost.sms_paise`: the payment link and the confirmation this call sent are
+    // its cost, and were missing from the ledger until the bug hunt (call-cost-misses-the-sms).
+    assert.ok(call.cost.smsPaise > 0, 'the SMS the call sent is on the call ledger')
+    assert.equal(call.cost.totalPaise, call.cost.llmPaise + call.cost.smsPaise, 'the total is the sum of its parts')
 
     // Idempotent: a hang-up after the loop closed the call is a no-op, and a turn is refused.
     await endCall(started.callId, 'hangup')
@@ -340,5 +368,95 @@ describe('outage (acceptance 6)', () => {
     assert.match(t3.reply, /Connecting you to the restaurant/)
     const call = await repos.getCall(b.callId)
     assert.deepEqual([call?.outcome, call?.handoffReason, call?.orderId], ['handoff', 'vendor_error', null])
+  })
+})
+
+describe('consent needs an answer (Build Spec §10, ADR 0005)', () => {
+  // consent-recorded-without-an-answer: Gemini routinely batches prose with a tool call, so one
+  // response can read the notice aloud and record agreement to it in the same breath. The caller
+  // was never given a turn to answer, and the transcript proves it.
+  it('refuses a record_consent batched with the notice, and records the yes on the next turn', async () => {
+    const phoneD = '+919876543213'
+    const deepa = await repos.upsertCustomer({ phone: phoneD, phoneHash: hashPhone(phoneD, PEPPER) }, SYSTEM)
+    const started = await startCall({ outletId: outlet.id, transport: 'browser', customerId: deepa.id, origin: ORIGIN })
+
+    const notice = spokenNotice('en', restaurant.name)
+    const t1 = await withScript(
+      [
+        { text: notice, toolCalls: [{ id: 'same-breath', name: 'record_consent', args: { agreed: true } }] },
+        { text: 'Shall I go ahead?' },
+      ],
+      () => takeTurn(started.callId, { text: 'one masala dosa please' }),
+    )
+    assert.deepEqual(t1.toolCalls.map((c) => [c.name, c.result]), [['record_consent', { ok: false, reason: 'notice_not_read' }]])
+    assert.equal(await repos.getConsent(deepa.id, restaurant.id), null, 'nobody can agree to words they were only just read')
+
+    // The caller speaks, and the same tool call now records — the notice went out a turn earlier.
+    const t2 = await withScript(
+      [{ toolCalls: [{ id: 'answered', name: 'record_consent', args: { agreed: true } }] }, { text: 'Thank you.' }],
+      () => takeTurn(started.callId, { text: 'yes, that is fine' }),
+    )
+    assert.deepEqual(t2.toolCalls.map((c) => c.result), [{ ok: true, data: { agreed: true } }])
+    const consent = await repos.getConsent(deepa.id, restaurant.id)
+    assert.equal(consent?.channel, 'call')
+    await endCall(started.callId, 'hangup')
+  })
+})
+
+describe('a closing signal ends the round (M2 design "The turn")', () => {
+  // closing-short-circuits-tool-bookkeeping: the tools after the signal used to run with their
+  // bookkeeping dropped — an order cooked and paid for that the call record never heard of.
+  it('executes nothing the model asks for after end_call in the same batch', async () => {
+    const started = await startCall({ outletId: outlet.id, transport: 'browser', customerPhoneHash: anita.phoneHash, origin: ORIGIN })
+    const t1 = await takeTurn(started.callId, { text: 'one masala dosa' })
+    assert.equal(okCalls(t1, 'add_to_cart').length, 1)
+
+    mockInbox.clear()
+    const t2 = await withScript(
+      [
+        {
+          toolCalls: [
+            { id: 'bye', name: 'end_call', args: { reason: 'customer_done' } },
+            { id: 'late', name: 'place_order', args: { fulfilment: 'pickup', payment_method: 'upi_link' } },
+          ],
+        },
+        { text: 'Goodbye!' },
+      ],
+      () => takeTurn(started.callId, { text: 'that is all, bye' }),
+    )
+    assert.deepEqual(
+      t2.toolCalls.map((c) => [c.name, c.result]),
+      [['end_call', { ok: true, data: { action: 'end', reason: 'customer_done' } }], ['place_order', { ok: false, reason: 'call_ended' }]],
+      'the late call is refused, with a result of its own so the next request is not rejected',
+    )
+    assert.deepEqual([t2.ended, t2.outcome, t2.orderId], [true, 'abandoned', undefined])
+    assert.deepEqual(mockInbox.list().map((m) => m.kind), [], 'nothing is texted to a caller who has hung up')
+
+    const orders = await db.select().from(schema.order).where(eq(schema.order.callId, started.callId))
+    assert.deepEqual(orders, [], 'no order was created after the caller ended the call')
+    const call = await repos.getCall(started.callId)
+    assert.deepEqual([call?.outcome, call?.orderId], ['abandoned', null], 'the record and the world agree')
+  })
+})
+
+describe('the tool-round cap (M2 design "The turn", step 3)', () => {
+  // empty-assistant-turn-after-round-cap: an assistant turn with neither text nor tool calls is
+  // rejected by the Anthropic Messages API on every later turn, which would kill the Build Spec
+  // §3 failover for the rest of the call.
+  it('records what the caller actually heard, never a content-less assistant turn', async () => {
+    const started = await startCall({ outletId: outlet.id, transport: 'browser', customerId: bala.id, origin: ORIGIN })
+    const t = await withScript(
+      Array.from({ length: 6 }, (_, i) => ({ toolCalls: [{ id: `round-${i}`, name: 'get_cart', args: {} }] })),
+      () => takeTurn(started.callId, { text: 'what is in my order' }),
+    )
+    assert.equal(t.reply, "Sorry, I didn't catch that. Could you say it again?")
+    assert.equal(t.toolCalls.length, 4, 'four rounds, then the answer is taken as it is')
+
+    const live = getSession(started.callId)
+    assert.ok(live)
+    const empty = live.messages.filter((m) => m.role === 'assistant' && m.text === null && m.toolCalls.length === 0)
+    assert.deepEqual(empty, [], 'the turn carries the line that was spoken')
+    assert.ok(toAnthropicMessages(live.messages).every((m) => m.content.length > 0), 'and maps to no empty Anthropic message')
+    await endCall(started.callId, 'hangup')
   })
 })

@@ -1,4 +1,4 @@
-import type { CartItemInput, PricedMenuItem } from '@/core/cart.ts'
+import { priceableLines, type CartItemInput, type PricedMenuItem } from '@/core/cart.ts'
 import { paise } from '@/core/money.ts'
 
 /**
@@ -69,14 +69,11 @@ export const toPriced = (categories: CategoryView[]): PricedMenuItem[] =>
     optionGroups: i.optionGroups,
   }))
 
-/** Drops lines that no longer resolve against today's menu (item sold out, variant retired). */
-export function prune(lines: CartItemInput[], priced: PricedMenuItem[]): CartItemInput[] {
-  const byId = new Map(priced.map((i) => [i.id, i]))
-  return lines.filter((l) => {
-    const item = byId.get(l.itemId)
-    if (!item || l.qty < 1) return false
-    if (l.variantId && !item.variants.some((v) => v.id === l.variantId)) return false
-    const options = new Set(item.optionGroups.flatMap((g) => g.options.map((o) => o.id)))
-    return l.optionIds.every((id) => options.has(id))
-  })
-}
+/**
+ * Drops lines that today's menu no longer accepts — item sold out, variant retired, and (finding
+ * unpriceable-cart-line-kills-cart) a line whose ids all still resolve but which `priceCart`
+ * refuses because a group was made required, a maximum was lowered or a delta now outruns the
+ * base price. Checking the ids alone let such a line through and it threw for the whole cart.
+ * Core's `priceableLines` is the one authority, so this cannot drift from what checkout will do.
+ */
+export const prune = priceableLines

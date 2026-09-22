@@ -202,16 +202,86 @@ export async function listAddresses(customerId: string, restaurantId: string) {
 }
 
 /**
+ * Not the full address: the audit row outlives a DPDP erasure of the customer, and CLAUDE.md
+ * forbids a full address anywhere it is not needed. Area and pincode locate the write for an
+ * auditor without reproducing the door.
+ */
+const addressAudit = (row: typeof customerAddress.$inferSelect) => ({
+  id: row.id,
+  customerId: row.customerId,
+  restaurantId: row.restaurantId,
+  label: row.label,
+  area: row.area,
+  pincode: row.pincode,
+  source: row.source,
+  isConfirmed: row.isConfirmed,
+})
+
+/**
+ * Case and internal whitespace alone must not make a second address: "12 MG Road", "12 mg road"
+ * and "12  MG  Road " are one door (finding duplicate-saved-addresses).
+ */
+const normalisedLine1 = (v: unknown) => sql`lower(regexp_replace(btrim(${v}), '\\s+', ' ', 'g'))`
+
+/**
  * An address is the first profile field a delivery order stores beyond the phone, so this is
  * where Build Spec §10's consent rule bites hardest. The check reads the live consent row; a
  * caller cannot pass one in.
+ *
+ * Finding duplicate-saved-addresses: saving the same door twice returns the row already there
+ * rather than a second one, because the checkout renders every row as a "Deliver here" option and
+ * there is no way to delete one. The guarantee lives here and not in the form: the address-link
+ * page and a manual order both reach this function without one.
  */
 export async function saveAddress(
   input: Omit<AddressInsert, 'id' | 'createdAt' | 'lastUsedAt'>,
   actor: Actor,
 ) {
-  return guarded('address.create', () => db.transaction(async (tx) => {
+  return guarded('address.save', () => db.transaction(async (tx) => {
     assertConsentForProfileWrite(await consentView(tx, input.customerId, input.restaurantId), 'order_fulfilment')
+
+    const existing = await tx.query.customerAddress.findFirst({
+      where: and(
+        eq(customerAddress.customerId, input.customerId),
+        eq(customerAddress.restaurantId, input.restaurantId),
+        sql`${normalisedLine1(customerAddress.line1)} = ${normalisedLine1(input.line1)}`,
+        // `is not distinct from`, not `=`: a voice address often has no pincode, and two
+        // pincode-less rows for the same line are still the same door.
+        sql`${customerAddress.pincode} is not distinct from ${input.pincode ?? null}`,
+      ),
+      // Rows predating this guard may already be duplicated; update the one `listAddresses` puts
+      // at the top, so the customer sees their correction where they expect it.
+      orderBy: [sql`${customerAddress.lastUsedAt} desc nulls last`, desc(customerAddress.createdAt)],
+    })
+
+    if (existing) {
+      // Fill in what this save newly supplies, and never lose what an earlier one did:
+      // `isConfirmed` only ever rises, and `source` records how the door first arrived.
+      // `lastUsedAt` is deliberately untouched — it means "last ordered to" and orders.ts sets
+      // it; bumping it on a re-save would outrank an address the customer actually used.
+      const row = firstRow(await tx.update(customerAddress)
+        .set({
+          label: input.label ?? existing.label,
+          landmark: input.landmark ?? existing.landmark,
+          area: input.area ?? existing.area,
+          lat: input.lat ?? existing.lat,
+          lng: input.lng ?? existing.lng,
+          isConfirmed: existing.isConfirmed || (input.isConfirmed ?? false),
+        })
+        .where(eq(customerAddress.id, existing.id))
+        .returning(), 'customer_address')
+
+      await writeAudit({
+        actorType: actor.type,
+        actorId: actor.id,
+        action: 'address.update',
+        entity: 'customer_address',
+        entityId: row.id,
+        before: addressAudit(existing),
+        after: addressAudit(row),
+      }, tx)
+      return row
+    }
 
     const row = firstRow(await tx.insert(customerAddress).values(input).returning(), 'customer_address')
     await writeAudit({
@@ -221,19 +291,7 @@ export async function saveAddress(
       entity: 'customer_address',
       entityId: row.id,
       before: null,
-      // Not the full address: the audit row outlives a DPDP erasure of the customer, and
-      // CLAUDE.md forbids a full address anywhere it is not needed. Area and pincode locate
-      // the write for an auditor without reproducing the door.
-      after: {
-        id: row.id,
-        customerId: row.customerId,
-        restaurantId: row.restaurantId,
-        label: row.label,
-        area: row.area,
-        pincode: row.pincode,
-        source: row.source,
-        isConfirmed: row.isConfirmed,
-      },
+      after: addressAudit(row),
     }, tx)
     return row
   }))

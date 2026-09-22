@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
-import { CALL_ALLOWANCE, FEE_PERCENT, OVERAGE_PER_CALL_PAISE, SUBSCRIPTION_PAISE, TRIAL_DAYS, estimateInvoice } from '@/core/billing.ts'
+import { FEE_PERCENT, OVERAGE_PER_CALL_PAISE, SUBSCRIPTION_PAISE, TRIAL_DAYS, estimateInvoice } from '@/core/billing.ts'
 import { formatISTDate, istMonthStart } from '@/core/calendar.ts'
 import { formatINR, paise } from '@/core/money.ts'
-import { channelOrderValue } from '@/db/repos/index.ts'
+import { channelOrderValue, countAllowanceCalls } from '@/db/repos/index.ts'
 import { currentOutlet } from '../../_lib/session.ts'
 import settings from '../settings/Settings.module.css'
 import today from '../today/Today.module.css'
@@ -26,9 +26,22 @@ export default async function BillingPage() {
   if (session.role !== 'owner') redirect('/app')
 
   const now = new Date()
-  const channelValue = await channelOrderValue(outlet.id, istMonthStart(now), now)
-  const aiCalls = 0 // M2
-  const invoice = estimateInvoice({ aiCalls, channelValuePaise: channelValue })
+  const monthStart = istMonthStart(now)
+  // Finding trial-invoice-charges-subscription: the count came from a hard-coded 0 while
+  // /app/today read the real figure, so the two screens could print different invoices for the
+  // same restaurant in the same minute. Both now read the same repository function.
+  const [channelValue, aiCalls] = await Promise.all([
+    channelOrderValue(outlet.id, monthStart, now),
+    countAllowanceCalls(outlet.id, monthStart, now),
+  ])
+  // A trialing restaurant owes no subscription and has its own call allowance (Build Spec §13).
+  const trialing = restaurant.status === 'trialing'
+  const invoice = estimateInvoice({
+    aiCalls,
+    channelValuePaise: channelValue,
+    trialing,
+    trialCallLimit: restaurant.trialCallLimit,
+  })
 
   const trialEnds = restaurant.trialStartedAt
     ? new Date(restaurant.trialStartedAt.getTime() + TRIAL_DAYS * 86_400_000)
@@ -44,15 +57,19 @@ export default async function BillingPage() {
           <span className={today.statLabel}>Plan</span>
           <span className={today.statValue}>{STATUS[restaurant.status] ?? restaurant.status}</span>
           <span className={today.statNote}>
-            {restaurant.status === 'trialing' && trialEnds
+            {trialing && trialEnds
               ? `${trialDaysLeft} days left, or ${restaurant.trialCallLimit} AI calls — whichever first`
               : `${formatINR(SUBSCRIPTION_PAISE)} a month`}
           </span>
         </div>
         <div className={today.stat}>
           <span className={today.statLabel}>AI calls this month</span>
-          <span className={`${today.statValue} num`}>{aiCalls} / {CALL_ALLOWANCE}</span>
-          <span className={today.statNote}>{formatINR(OVERAGE_PER_CALL_PAISE)} per call beyond the allowance · from M2</span>
+          <span className={`${today.statValue} num`}>{aiCalls} / {invoice.allowance}</span>
+          <span className={today.statNote}>
+            {trialing
+              ? 'Free during the trial'
+              : `${formatINR(OVERAGE_PER_CALL_PAISE)} per call beyond the allowance`}
+          </span>
         </div>
         <div className={today.stat}>
           <span className={today.statLabel}>Estimated invoice</span>
@@ -65,9 +82,12 @@ export default async function BillingPage() {
         <h2 className={settings.legend} style={{ margin: 0 }}>How this month adds up</h2>
         <table className={today.table}>
           <tbody>
-            <tr><td>Subscription</td><td className={`${today.right} num`}>{formatINR(invoice.subscriptionPaise)}</td></tr>
             <tr>
-              <td>Overage · <span className="num">{invoice.overageCalls}</span> calls beyond {CALL_ALLOWANCE}</td>
+              <td>Subscription{trialing ? ' · free during the trial' : ''}</td>
+              <td className={`${today.right} num`}>{formatINR(invoice.subscriptionPaise)}</td>
+            </tr>
+            <tr>
+              <td>Overage · <span className="num">{invoice.overageCalls}</span> calls beyond {invoice.allowance}</td>
               <td className={`${today.right} num`}>{formatINR(invoice.overagePaise)}</td>
             </tr>
             <tr>

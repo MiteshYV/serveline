@@ -2,14 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { payments } from '@/adapters/payments/index.ts'
+import { closeLinks, payments } from '@/adapters/payments/index.ts'
 import { sms } from '@/adapters/sms/index.ts'
 import { phonePepper } from '@/auth/secrets.ts'
 import { formatINR, paise } from '@/core/money.ts'
-import { IllegalTransitionError, ORDER_TRANSITIONS, type OrderStatus } from '@/core/orders.ts'
+import { IllegalTransitionError, ORDER_TRANSITIONS, isTerminal, type OrderStatus } from '@/core/orders.ts'
 import { hashPhone } from '@/core/phone.ts'
 import {
-  attachPayment, convertToCod, getBoardOrder, logSms, markCorrected, orderNumbers, transitionOrder,
+  attachPayment, convertToCod, getBoardOrder, logSms, markCorrected, orderNumbers,
+  supersedeOutstandingPayments, transitionOrder,
 } from '@/db/repos/index.ts'
 import { toCardWire, type CardWire } from '@/ui/orderWire.ts'
 import { appOrigin } from '../_lib/origin.ts'
@@ -58,9 +59,12 @@ export async function transition(input: { orderId: string; to: OrderStatus; reas
     // Build Spec §7 "convert to COD": the primary on an awaiting_payment card is "Confirm as
     // cash on delivery" (orderActions.ts), so confirming from there flips the method first.
     if (to === 'confirmed' && own.row.status === 'awaiting_payment' && own.row.paymentMethod === 'upi_link') {
-      await convertToCod(orderId, own.actor)
+      await closeLinks((await convertToCod(orderId, own.actor)).cancelledLinkIds)
     }
     await transitionOrder(orderId, to, own.actor, reason)
+    // A cancelled or delivered order is not owed money on a link any more, and a link left live
+    // on one takes money nobody will refund (bug hunt: resend-payment-link-on-terminal-order).
+    if (isTerminal(to)) await closeLinks(await supersedeOutstandingPayments(orderId, own.actor))
   } catch (e) {
     if (e instanceof IllegalTransitionError) return { ok: false, error: 'illegal' }
     // A compare-and-set miss (another phone moved it first) or a missing reason: both are
@@ -83,7 +87,12 @@ export async function convertToCodAction(orderId: string): Promise<ActionResult>
   const own = await ownOrder(orderId)
   if (!own) return { ok: false, error: 'not_found' }
   if (own.row.paymentStatus === 'paid') return { ok: false, error: 'already_paid' }
-  await convertToCod(orderId, own.actor)
+  // Cash cannot be taken on an order that is over. The card hides the action (orderWire.ts), and
+  // a second counter phone whose board has not caught up is why that is not enough.
+  if (isTerminal(own.row.status)) return { ok: false, error: 'not_convertible' }
+  // Cancelling at the gateway is what stops the diner who taps the payment link still in their
+  // inbox being charged on top of the cash (bug hunt: cod-conversion-leaves-upi-link-payable).
+  await closeLinks((await convertToCod(orderId, own.actor)).cancelledLinkIds)
   if (own.row.status === 'awaiting_payment') await transitionOrder(orderId, 'confirmed', own.actor)
   return reload(orderId)
 }
@@ -98,9 +107,17 @@ export async function resendPaymentLink(orderId: string): Promise<ActionResult> 
   const own = await ownOrder(orderId)
   if (!own) return { ok: false, error: 'not_found' }
   const { row, restaurant, actor } = own
-  if (row.paymentStatus === 'paid' || row.paymentMethod !== 'upi_link') return { ok: false, error: 'not_linkable' }
+  // `isTerminal` as the card's `canResendLink` has it (orderWire.ts): a cancelled order must not
+  // be sent a live "pay for your order" SMS, and the client guard is not the trust boundary
+  // (bug hunt: resend-payment-link-on-terminal-order).
+  if (row.paymentStatus === 'paid' || row.paymentMethod !== 'upi_link' || isTerminal(row.status)) {
+    return { ok: false, error: 'not_linkable' }
+  }
   const phone = row.customer?.phone
   if (!phone) return { ok: false, error: 'no_phone' }
+
+  // The link this one replaces stops being payable now, not when it expires half an hour later.
+  await closeLinks(await supersedeOutstandingPayments(row.id, actor))
 
   const link = await payments().createLink({
     orderId: row.id,

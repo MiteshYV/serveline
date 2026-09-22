@@ -9,6 +9,7 @@ import { td } from '@/ui/i18n-dashboard.ts'
 import { orderStateLabel, t, type Lang } from '@/ui/i18n.ts'
 import { OrderCard } from '@/ui/OrderCard.tsx'
 import { cardFromWire, type BoardGroup, type CardWire } from '@/ui/orderWire.ts'
+import { istDate, msToNextIstDayStart } from '@/core/calendar.ts'
 import type { OrderStatus } from '@/core/orders.ts'
 import { convertToCodAction, markCorrectedAction, resendPaymentLink, transition, type ActionResult } from './board-actions.ts'
 import { useOrderSound } from './sound.ts'
@@ -51,6 +52,10 @@ export function Board({ outletId, lang, initial, since, ordersToday }: Props) {
   const [announce, setAnnounce] = useState('')
   // "N orders today" (design §7.9) — placed today, so it grows on arrival, never on completion.
   const [todayCount, setTodayCount] = useState(ordersToday)
+  // The IST day `todayCount` belongs to. A counter tablet stays open for days, so the count has
+  // to be reset from the clock; nothing else in the mounted tree reads it
+  // (finding orders-today-never-resets-at-midnight).
+  const dayRef = useRef(istDate(new Date()))
   const sound = useOrderSound()
   const playRef = useRef(sound.play)
   playRef.current = sound.play
@@ -84,8 +89,13 @@ export function Board({ outletId, lang, initial, since, ordersToday }: Props) {
       return next
     })
     if (arrived > 0) {
+      // An order arriving after IST midnight starts the new day, rather than adding to yesterday's
+      // total, in case the timer below has not fired yet (a sleeping tablet throttles it).
+      const today = istDate(new Date())
+      const rolled = today !== dayRef.current
+      if (rolled) dayRef.current = today
       setNewCount((n) => n + arrived)
-      setTodayCount((n) => n + arrived)
+      setTodayCount((n) => (rolled ? arrived : n + arrived))
       setPulseKey((k) => k + 1)
       playRef.current()
     } else {
@@ -96,6 +106,40 @@ export function Board({ outletId, lang, initial, since, ordersToday }: Props) {
       }
     }
   }, [lang])
+
+  // ---- the IST day boundary (finding orders-today-never-resets-at-midnight) ----
+  // `ordersToday` is seeded once on the server and the board is then kept live by SSE alone, so
+  // without this a tablet left on overnight shows yesterday's trade all morning. A timer alone is
+  // not enough — a backgrounded or sleeping tablet throttles it — so the day is re-read on wake.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const rollIfNewDay = () => {
+      const today = istDate(new Date())
+      if (today === dayRef.current) return
+      dayRef.current = today
+      setTodayCount(0)
+    }
+    const arm = () => {
+      // A second past the boundary, so a timer that fires a hair early still sees the new date.
+      timer = setTimeout(() => {
+        rollIfNewDay()
+        arm()
+      }, msToNextIstDayStart(new Date()) + 1_000)
+    }
+    const onWake = () => {
+      rollIfNewDay()
+      clearTimeout(timer)
+      arm()
+    }
+    arm()
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
+    }
+  }, [])
 
   // ---- transport: SSE, then a 5-second poll when the stream fails (Build Spec §7) ----
   useEffect(() => {

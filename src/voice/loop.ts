@@ -142,11 +142,10 @@ export async function startCall(input: {
   })
   session.addressId = addressId
   // Menu grounding (Build Spec §5.3) is "an id the model was shown in this call": the prompt shows
-  // the usual order's ids, so they count as shown, and add_to_cart can replay them without a search.
-  for (const item of usualPriced) {
-    session.seenItemIds.add(item.id)
-    session.searchResults.set(item.id, item)
-  }
+  // the usual order's ids, so they count as shown, and add_to_cart can replay them without a
+  // search. Ids only — the cart is priced from the live menu, never from a snapshot taken here
+  // (read-back-total-is-not-the-charged-total).
+  for (const item of usualPriced) session.seenItemIds.add(item.id)
   calls.set(call.id, {
     deps: { customer: caller ? { id: caller.id, phoneHash: caller.phoneHash } : null, restaurant, outlet, origin: input.origin },
     profile, consented, seq: 1, orderId: null, ordered: false, enquired: false, deflected: false,
@@ -247,7 +246,13 @@ export type TurnResult = {
 
 /** How a turn ends the call. `transfer` parks the cart as a needs_attention order (design "Handoff without a telephone"). */
 /** `surface`: the browser hung up or the page went away — a mundane end, not a reason §12 should read. */
-type Closing = { outcome: Outcome; reason: string; transfer: boolean; surface?: boolean }
+/**
+ * `outcome` left out means "classify from the call as it stands when it closes". A caller's own
+ * end must be classified after every tool in that round has run, not at the moment the signal was
+ * seen, or an order placed in the same round leaves the row saying `abandoned` with an order id
+ * on it (closing-short-circuits-tool-bookkeeping).
+ */
+type Closing = { outcome?: Outcome; reason: string; transfer: boolean; surface?: boolean }
 
 /** This turn's ledger entries, written once at the end whatever happened in between. */
 type Ledger = { llmPaise: number; tokensIn: number; tokensOut: number; smsPaise: number }
@@ -291,13 +296,13 @@ export async function takeTurn(callId: string, turn: { text: string; lang?: Lang
   // re-asks alone has no tokens to show for it.
   await addCost(callId, ledger)
 
-  if (answer.closing) await close(session, state, answer.closing)
+  const outcome = answer.closing ? await close(session, state, answer.closing) : undefined
   return {
     reply: answer.reply,
     lang: session.lang,
     toolCalls: answer.toolCalls,
     ended: session.ended,
-    ...(answer.closing ? { outcome: answer.closing.outcome } : {}),
+    ...(outcome ? { outcome } : {}),
     ...(state.orderId ? { orderId: state.orderId } : {}),
   }
 }
@@ -347,24 +352,44 @@ async function respond(
 
     const execute = response.toolCalls.length > 0 && !closing && round < MAX_TOOL_ROUNDS
     // Calls that will not run are not recorded as asked: a real provider refuses the next request
-    // if a tool call in the history has no result.
-    session.messages.push({ role: 'assistant', text: response.text, toolCalls: execute ? response.toolCalls : [] })
+    // if a tool call in the history has no result. For the same reason the turn is never both
+    // text-less and call-less — the Anthropic mapping renders that as an empty assistant message,
+    // which the Messages API rejects on every later turn of the call
+    // (empty-assistant-turn-after-round-cap). At the round cap the re-ask below is what the caller
+    // actually hears, so recording it keeps the history truthful.
+    const calls = execute ? response.toolCalls : []
+    const said = response.text ?? (calls.length === 0 ? lines.reask : null)
+    session.messages.push({ role: 'assistant', text: said, toolCalls: calls })
     if (response.text) {
       reply = response.text
-      // Build Spec §10: consent follows the notice, so the tool needs to know it went out.
-      if (!session.noticeRead && noticeWasRead(response.text, session.lang, state.deps.restaurant.name)) {
-        session.noticeRead = true
+      // Build Spec §10: consent follows the notice, so the tool needs to know which turn it went
+      // out in — not merely that it did (consent-recorded-without-an-answer). `turnCount` was
+      // incremented for this turn before respond() was called, so it is this turn's number.
+      if (session.noticeReadAtTurn === undefined && noticeWasRead(response.text, session.lang, state.deps.restaurant.name)) {
+        session.noticeReadAtTurn = session.turnCount
       }
     }
     if (!execute) break
 
     const results: { id: string; name: string; result: unknown }[] = []
     for (const call of response.toolCalls) {
+      if (closing) {
+        // The invariant this file states: nothing the model asks for after a closing signal is
+        // executed — so an order is not created, and an SMS is not sent, after the caller has
+        // gone. Every call still needs a result for the reason given above
+        // (closing-short-circuits-tool-bookkeeping).
+        const refused: ToolResult = { ok: false, reason: 'call_ended' }
+        records.push({ name: call.name, args: call.args, result: refused, ms: 0 })
+        results.push({ id: call.id, name: call.name, result: refused })
+        continue
+      }
       const started = performance.now()
       const result = await runTool(call.name, call.args, session, state.deps)
       records.push({ name: call.name, args: call.args, result, ms: Math.round(performance.now() - started) })
       results.push({ id: call.id, name: call.name, result })
-      closing ??= note(state, call.name, result, ledger)
+      // Bookkeeping for every call that ran, whichever one carried the signal: the assignment is
+      // unconditional because the guard above has already established that `closing` is unset.
+      closing = note(state, call.name, result, ledger)
     }
     session.messages.push({ role: 'tool', results })
   }
@@ -399,7 +424,9 @@ async function complete(session: Session, req: LlmRequest, ledger: Ledger): Prom
   }
 }
 
-const placed = z.object({ orderId: z.string() })
+// `smsPaise` is what placeOrder's own messages cost this call; optional because place-order.ts
+// does not report it yet (call-cost-misses-the-sms-the-call-sent, and src/voice/tools.ts).
+const placed = z.object({ orderId: z.string(), smsPaise: z.number().int().nonnegative().optional() })
 const consentGiven = z.object({ agreed: z.boolean() })
 const signal = z.object({ reason: z.string() })
 const smsSent = z.object({ costPaise: z.number().int() })
@@ -423,13 +450,18 @@ function note(state: CallState, name: string, result: ToolResult, ledger: Ledger
       // assistant does not read it twice (Build Spec §10).
       if (consentGiven.parse(result.data).agreed) state.consented = true
       return undefined
-    case 'place_order':
-      state.orderId = placed.parse(result.data).orderId
+    case 'place_order': {
+      const order = placed.parse(result.data)
+      // The first placement is the linked one; `place_order` refuses a second, so this is it.
+      state.orderId ??= order.orderId
+      ledger.smsPaise += order.smsPaise ?? 0
       return undefined
+    }
     case 'transfer_to_human':
       return { outcome: 'handoff', reason: signal.parse(result.data).reason, transfer: true }
     case 'end_call':
-      return { outcome: endOutcome(state), reason: signal.parse(result.data).reason, transfer: false }
+      // No outcome: it is classified in close(), after the rest of this round has run.
+      return { reason: signal.parse(result.data).reason, transfer: false }
     default:
       return undefined
   }
@@ -451,18 +483,21 @@ export async function endCall(callId: string, reason: string): Promise<void> {
   const session = getSession(callId)
   const state = calls.get(callId)
   if (!session || !state || session.ended) return
-  await close(session, state, { outcome: endOutcome(state), reason, transfer: false, surface: true })
+  await close(session, state, { reason, transfer: false, surface: true })
 }
 
 /** Build Spec §5.2 post-call: the parked order on a transfer, then outcome, intent, duration and the allowance flag. */
-async function close(session: Session, state: CallState, closing: Closing): Promise<void> {
+async function close(session: Session, state: CallState, closing: Closing): Promise<Outcome> {
   session.ended = true
-  // Not when an order was already placed: the cart is not cleared by place_order, and the counter
-  // has that order — the call row links it below.
+  // Not when an order was already placed: that order is the counter's and the call row links it
+  // below. `place_order` empties the cart on success, so this is belt and braces.
   if (closing.transfer && session.cart.length > 0 && !state.orderId) await parkOrder(session, state, closing.reason)
+  // Classified from the call as it stands now, not when the signal was seen, so a tool that ran
+  // later in the same round still counts (closing-short-circuits-tool-bookkeeping).
+  const outcome = closing.outcome ?? endOutcome(state)
   try {
     await finishCall(session.callId, {
-      outcome: closing.outcome,
+      outcome,
       // Why the assistant stopped handling the call: a transfer, a guardrail, a vendor failure.
       // Not a hang-up — "pagehide" is not a reason, and §12's metrics read this column.
       handoffReason: closing.surface ? undefined : closing.reason,
@@ -477,6 +512,7 @@ async function close(session: Session, state: CallState, closing: Closing): Prom
     deleteSession(session.callId)
     calls.delete(session.callId)
   }
+  return outcome
 }
 
 /**

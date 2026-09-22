@@ -80,9 +80,11 @@ const REQUIRED_ENV = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOO
  * Stub. No Razorpay account exists (M1 design §"Build mode"), so `VENDOR_MODE=live` fails loudly
  * here rather than quietly falling back to the mock (CLAUDE.md).
  *
- * ponytail: when the account arrives this becomes POST /v1/payment_links with `upi_link: true`,
- * `expire_by` = now + 30 min, `reference_id` = orderId and a `transfers[]` entry to the restaurant's
- * Route linked account (Build Spec §9). verifyWebhook and parseWebhook above are reused as-is with
+ * ponytail: when the account arrives `createLink` becomes POST /v1/payment_links with
+ * `upi_link: true`, `expire_by` = now + 30 min, `reference_id` = orderId and a `transfers[]` entry
+ * to the restaurant's Route linked account (Build Spec §9), and `cancelLink` becomes
+ * POST /v1/payment_links/{id}/cancel (400 on a link already paid or cancelled, which is why
+ * `closeLinks` tolerates a throw). verifyWebhook and parseWebhook above are reused as-is with
  * RAZORPAY_WEBHOOK_SECRET.
  */
 export function razorpayPayments(): PaymentsAdapter {

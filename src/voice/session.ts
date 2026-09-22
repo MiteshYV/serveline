@@ -8,7 +8,7 @@
  */
 
 import type { LlmMessage } from '../adapters/llm/index.ts'
-import type { CartItemInput, PricedMenuItem } from '../core/cart.ts'
+import type { CartItemInput } from '../core/cart.ts'
 import type { Lang } from '../ui/i18n.ts'
 
 export type Session = {
@@ -23,13 +23,22 @@ export type Session = {
   cart: CartItemInput[]
   /** Build Spec §5.3 menu grounding: `add_to_cart` accepts an id only if it is in here. */
   seenItemIds: Set<string>
-  /** The priced items `search_menu` returned, by id: what the cart prices against mid-call. */
-  searchResults: Map<string, PricedMenuItem>
   addressId: string | null
   codeText: string | null
+  /**
+   * The order this call placed (read-back-total-is-not-the-charged-total's sibling,
+   * place-order-not-idempotent-per-call): one call places one order, so `place_order` refuses once
+   * this is set. Written only by a successful placement, never by a refusal.
+   */
+  orderId: string | null
   turnCount: number
-  /** The spoken consent notice has been read aloud in this call; record_consent refuses until it has. */
-  noticeRead: boolean
+  /**
+   * The turn in which the spoken consent notice was read aloud, or undefined if it has not been.
+   * A number rather than a flag because `record_consent` has to know the notice went out in an
+   * *earlier* turn than the answer (consent-recorded-without-an-answer): a model that batches the
+   * notice and the tool call in one response would otherwise record a yes the caller never said.
+   */
+  noticeReadAtTurn?: number
   strikes: { abuse: number; lowConfidence: number; llmFailures: number }
   provider: 'primary' | 'secondary'
   messages: LlmMessage[]
@@ -65,11 +74,10 @@ export function createSession(init: {
     lang: init.lang ?? 'en',
     cart: [],
     seenItemIds: new Set(),
-    searchResults: new Map(),
     addressId: null,
     codeText: null,
+    orderId: null,
     turnCount: 0,
-    noticeRead: false,
     strikes: { abuse: 0, lowConfidence: 0, llmFailures: 0 },
     provider: 'primary',
     messages: [],

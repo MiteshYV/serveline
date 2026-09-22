@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, notInArray } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, ne, notInArray } from 'drizzle-orm'
 import type { Cart, CartItemInput, CartLine } from '../../core/cart.ts'
 import {
   ORDER_TRANSITIONS, assertTransition, isTerminal, requiresReason, type OrderStatus,
@@ -308,11 +308,68 @@ export async function markCorrected(orderId: string, actor: Actor): Promise<Orde
 }
 
 /**
+ * Closes this order's outstanding payment links in the database: every `awaiting` row becomes
+ * `unpaid`, with a `payment.supersede` audit row each. `unpaid` is the enum's nearest to
+ * "closed" — no money moved on this link and none is expected.
+ *
+ * Returns the link ids it closed so the caller can cancel them at the gateway with
+ * `closeLinks` (src/adapters/payments/index.ts). That second half is what actually stops a
+ * capture, and it is a vendor HTTP call: it belongs in the adapter layer and outside this
+ * transaction, never in here (bug hunt: superseded-payment-link-still-payable).
+ */
+async function supersedeIn(
+  tx: Tx,
+  orderId: string,
+  actor: Actor,
+  supersededBy?: string,
+): Promise<string[]> {
+  const superseded = await tx
+    .update(payment)
+    .set({ status: 'unpaid' })
+    // `supersededBy` is the replacement row, inserted in this same transaction and `awaiting`
+    // itself: it is the one row this must not close.
+    .where(and(
+      eq(payment.orderId, orderId),
+      eq(payment.status, 'awaiting'),
+      supersededBy ? ne(payment.id, supersededBy) : undefined,
+    ))
+    .returning({ id: payment.id, linkId: payment.linkId })
+
+  for (const old of superseded) {
+    await writeAudit({
+      actorType: actor.type,
+      actorId: actor.id,
+      action: 'payment.supersede',
+      entity: 'payment',
+      entityId: old.id,
+      before: { status: 'awaiting' },
+      after: { status: 'unpaid', ...(supersededBy ? { supersededBy } : {}) },
+    }, tx)
+  }
+  // A row with no link id has nothing to cancel at the gateway.
+  return superseded.flatMap((row) => (row.linkId ? [row.linkId] : []))
+}
+
+/** `supersedeIn` on its own transaction, for a caller that has none (a resend, a cancellation). */
+export function supersedeOutstandingPayments(orderId: string, actor: Actor): Promise<string[]> {
+  return db.transaction((tx) => supersedeIn(tx, orderId, actor))
+}
+
+/** Exported for `convertToCod`, which supersedes in the same transaction as the method flip. */
+export { supersedeIn as supersedeOutstandingPaymentsIn }
+
+/**
  * A payment link now exists for this order. Records the `payment`, flags the order as
  * awaiting, and — if the order is still `received` — moves it to `awaiting_payment`, the
  * UPI-link branch of Build Spec §4. An order already past `received` (a resent link, Build
- * Spec §7) keeps its status and gains another payment row — and the link it replaces is
- * closed, so a customer holding both SMSes has one live link, not two.
+ * Spec §7) keeps its status and gains another payment row, and the row it replaces is closed
+ * here.
+ *
+ * Closing the replaced row is not enough to stop the gateway taking money on it: callers
+ * issuing a replacement link cancel the old one at the gateway first, through
+ * `supersedeOutstandingPayments` + `closeLinks` (bug hunt:
+ * superseded-payment-link-still-payable). By the time they reach here there is usually
+ * nothing left to supersede.
  */
 export async function attachPayment(
   input: { orderId: string; gateway: string; linkId: string; amountPaise: number },
@@ -321,14 +378,6 @@ export async function attachPayment(
   return db.transaction(async (tx) => {
     const current = await tx.query.order.findFirst({ where: eq(order.id, input.orderId) })
     if (!current) throw new Error(`No order ${input.orderId}`)
-
-    // The enum has no `expired`; `unpaid` is the nearest — no money moved on this link and none
-    // is expected. If the customer pays the old link anyway, `markPaid` still honours it once.
-    const superseded = await tx
-      .update(payment)
-      .set({ status: 'unpaid' })
-      .where(and(eq(payment.orderId, input.orderId), eq(payment.status, 'awaiting')))
-      .returning({ id: payment.id })
 
     const row = firstRow(
       await tx
@@ -344,6 +393,9 @@ export async function attachPayment(
       'payment',
     )
 
+    // If the customer pays a superseded link anyway, `markPaid` still honours it once.
+    await supersedeIn(tx, input.orderId, actor, row.id)
+
     if (current.status === 'received') await transitionIn(tx, current, 'awaiting_payment', actor)
     await tx.update(order).set({ paymentStatus: 'awaiting' }).where(eq(order.id, current.id))
 
@@ -356,17 +408,6 @@ export async function attachPayment(
       before: null,
       after: row,
     }, tx)
-    for (const old of superseded) {
-      await writeAudit({
-        actorType: actor.type,
-        actorId: actor.id,
-        action: 'payment.supersede',
-        entity: 'payment',
-        entityId: old.id,
-        before: { status: 'awaiting' },
-        after: { status: 'unpaid', supersededBy: row.id },
-      }, tx)
-    }
     return row
   })
 }

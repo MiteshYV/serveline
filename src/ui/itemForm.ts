@@ -128,10 +128,25 @@ export function parseItemForm(fd: FormData): ItemFormResult {
   const d = parsed.data
   const present = <T>(rows: (T | null)[]): T[] => rows.filter((r): r is T => r !== null)
   const errors: Record<string, string> = {}
+  // Finding negative-unit-price-cart: `upsertItem` refuses the whole row when a delta can take the
+  // price below zero. These put the reason under the input that caused it; the repository, which
+  // also weighs several options chosen together, stays the guarantee.
+  const belowZero = 'This takes the price below zero'
+  present(d.variants).forEach((v) => {
+    if (d.pricePaise + v.priceDeltaPaise < 0) {
+      errors[`variants[${d.variants.indexOf(v)}].priceDeltaPaise`] = belowZero
+    }
+  })
+
   const groups = present(d.groups).map((g, gi) => {
     const options = present(g.options)
     if (options.length === 0) errors[`groups[${d.groups.indexOf(g)}].name`] = 'A group needs at least one option'
     if (g.maxSelect < g.minSelect) errors[`groups[${d.groups.indexOf(g)}].maxSelect`] = 'Max must be at least min'
+    options.forEach((o) => {
+      if (d.pricePaise + o.priceDeltaPaise < 0) {
+        errors[`groups[${d.groups.indexOf(g)}].options[${g.options.indexOf(o)}].priceDeltaPaise`] = belowZero
+      }
+    })
     void gi
     return { id: g.id, name: g.name, minSelect: g.minSelect, maxSelect: g.maxSelect, options }
   })

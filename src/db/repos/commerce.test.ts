@@ -26,6 +26,9 @@ const { db, schema } = await import('../client.ts')
 const customers = await import('./customers.ts')
 const orders = await import('./orders.ts')
 const codes = await import('./codes.ts')
+const dashboard = await import('./dashboard.ts')
+const { closeLinks } = await import('../../adapters/payments/index.ts')
+const { mockPayments, mockPaymentsAdapter } = await import('../../adapters/payments/mock.ts')
 const { SYSTEM } = await import('./_actor.ts')
 
 await migrate(db, { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) })
@@ -412,6 +415,39 @@ describe('markPaid', () => {
     assert.equal(stale?.status, 'unpaid', 'left as attachPayment closed it')
     assert.equal(stale?.paymentId, null)
     assert.equal(await auditCount('payment'), paymentAudits, 'nothing written')
+  })
+})
+
+describe('convertToCod', () => {
+  it('closes the outstanding link, in the database and at the gateway', async () => {
+    // The counter takes cash because the link was not paid; if the link stays payable the diner
+    // who taps the SMS later is charged on top of the cash, with no refund path (bug hunt:
+    // cod-conversion-leaves-upi-link-payable).
+    const o = await placeOrder({ paymentMethod: 'upi_link' })
+    const link = await mockPaymentsAdapter.createLink({
+      orderId: o.id, amountPaise: o.totalPaise, restaurantId: restaurant.id, description: 'Udupi Grand order',
+    })
+    await orders.attachPayment({ orderId: o.id, gateway: 'mock', linkId: link.linkId, amountPaise: o.totalPaise }, SYSTEM)
+
+    const { order: converted, cancelledLinkIds } = await dashboard.convertToCod(o.id, asOwner)
+    assert.equal(converted.paymentMethod, 'cod')
+    assert.equal(converted.paymentStatus, 'unpaid')
+    assert.deepEqual(cancelledLinkIds, [link.linkId])
+    const rows = (await orders.getOrder(o.id))?.payments ?? []
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0]?.status, 'unpaid', 'no link on a cash order is owed money')
+
+    // The half that actually stops the second charge: our row going `unpaid` never did.
+    await closeLinks(cancelledLinkIds)
+    assert.equal(mockPayments.get(link.linkId)?.status, 'cancelled')
+    assert.throws(() => mockPayments.markPaid(link.linkId), /cancelled/)
+  })
+
+  it('refuses an order that is already paid', async () => {
+    const o = await placeOrder({ paymentMethod: 'upi_link' })
+    await orders.attachPayment({ orderId: o.id, gateway: 'mock', linkId: 'plink_cod_paid', amountPaise: o.totalPaise }, SYSTEM)
+    await orders.markPaid('plink_cod_paid', 'pay_cod_paid', o.totalPaise, {})
+    await assert.rejects(dashboard.convertToCod(o.id, asOwner), /already paid/)
   })
 })
 

@@ -13,7 +13,7 @@ import { db } from '../client.ts'
 import {
   customer, externalOrderCount, order, orderEvent, orderItem, payment,
 } from '../schema/index.ts'
-import { sortOpenOrders } from './orders.ts'
+import { sortOpenOrders, supersedeOutstandingPaymentsIn } from './orders.ts'
 import { type Actor, firstRow, writeAudit } from './ops.ts'
 
 const TERMINAL = (Object.keys(ORDER_TRANSITIONS) as OrderStatus[]).filter(isTerminal)
@@ -74,6 +74,12 @@ export async function getBoardOrder(orderId: string) {
  * a uuid across a counter, so the number is the order's rank among the outlet's orders on its IST
  * calendar day: #1 is the first order after midnight, and it is stable for the order's life.
  * Only orders from the earliest given day onwards are ranked, so the window stays small.
+ *
+ * `at time zone 'UTC'` is load-bearing: `placed_at` is a timestamptz, so casting it to a date
+ * consults the database session's own timezone, and the +330 minutes then stacks on top of that
+ * offset. On a host east or west of UTC the day rolled at the wrong hour and two orders could
+ * share a number — a kitchen shouting "#3" for two different bags. Converting to a plain
+ * timestamp first makes the IST shift the only one applied.
  */
 export async function orderNumbers(
   outletId: string,
@@ -85,7 +91,7 @@ export async function orderNumbers(
     .select({
       id: order.id,
       n: sql<number>`row_number() over (
-        partition by ((${order.placedAt} + interval '330 minutes')::date)
+        partition by ((((${order.placedAt}) at time zone 'UTC') + interval '330 minutes')::date)
         order by ${order.placedAt}, ${order.id}
       )::int`.as('n'),
     })
@@ -99,8 +105,14 @@ export async function orderNumbers(
 
 /**
  * Build Spec §7 "convert to COD": the customer did not pay the UPI link, so the counter takes
- * cash. Flips the method; the caller then moves `awaiting_payment → confirmed` with
- * `transitionOrder`, which is core's legality check and writes the event.
+ * cash. Flips the method and, in the same transaction, closes the order's outstanding payment
+ * rows — cash is now how this order is paid, so no link on it is owed money any more.
+ *
+ * Returns the closed links' ids: the caller cancels them at the gateway with `closeLinks`
+ * (src/adapters/payments/index.ts) as soon as this commits. Without that the diner who taps the
+ * payment link still in their inbox is charged a second time, on top of the cash the rider took
+ * (bug hunt: cod-conversion-leaves-upi-link-payable). The vendor call is not made here: a repo
+ * function must not hold a transaction open across the network.
  *
  * ponytail: two transactions, not one — `transitionIn` is private to orders.ts. If the second
  * fails the order is COD and still awaiting payment, and the same button repeats the move.
@@ -112,9 +124,12 @@ export async function convertToCod(orderId: string, actor: Actor) {
     if (before.paymentStatus === 'paid') throw new Error('Order is already paid; nothing to convert')
     const after = firstRow(
       await tx.update(order).set({ paymentMethod: 'cod', paymentStatus: 'unpaid' })
-        .where(eq(order.id, orderId)).returning(),
+        // Compare-and-set on the payment status: a webhook that commits between the read above
+        // and this write would otherwise be lost, flipping a just-paid order back to unpaid.
+        .where(and(eq(order.id, orderId), eq(order.paymentStatus, before.paymentStatus))).returning(),
       `order ${orderId}`,
     )
+    const cancelledLinkIds = await supersedeOutstandingPaymentsIn(tx, orderId, actor)
     await writeAudit({
       actorType: actor.type,
       actorId: actor.id,
@@ -124,7 +139,7 @@ export async function convertToCod(orderId: string, actor: Actor) {
       before: { paymentMethod: before.paymentMethod, paymentStatus: before.paymentStatus },
       after: { paymentMethod: after.paymentMethod, paymentStatus: after.paymentStatus },
     }, tx)
-    return after
+    return { order: after, cancelledLinkIds }
   })
 }
 
@@ -190,13 +205,33 @@ export async function channelOrderValue(outletId: string, from: Date, to: Date):
 
 /** Build Spec §12's denominator: aggregator counts for weeks starting in [from, to). Dates are IST `YYYY-MM-DD`. */
 export async function externalOrdersBetween(outletId: string, fromDate: string, toDate: string): Promise<number> {
-  const [row] = await db
+  const weeks = await externalWeeksBetween(outletId, fromDate, toDate)
+  return weeks.reduce((n, w) => n + w.orders, 0)
+}
+
+/**
+ * The weeks the owner has actually entered, each with its Monday — not just their sum.
+ *
+ * Direct Order Share is a ratio, and the two sides of it are counted over different calendars: the
+ * numerator is orders delivered on given days, the denominator is whole weeks typed in from the
+ * aggregator apps. Summing the weeks throws away the only thing that lets a caller line the two up,
+ * and the old /app/today divided a month of direct orders by whichever weeks happened to start
+ * inside that month — which on the 3rd of a month is one week against three days, and reads as
+ * 100% (docs/reviews/2026-09-22-bug-hunt.md, direct-order-share-divides-month-by-partial-weeks).
+ */
+export async function externalWeeksBetween(
+  outletId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<{ weekStart: string; orders: number }[]> {
+  return db
     .select({
-      v: sql<number>`coalesce(sum(${externalOrderCount.swiggyOrders} + ${externalOrderCount.zomatoOrders} + ${externalOrderCount.otherOrders}), 0)::int`,
+      weekStart: externalOrderCount.weekStart,
+      orders: sql<number>`(${externalOrderCount.swiggyOrders} + ${externalOrderCount.zomatoOrders} + ${externalOrderCount.otherOrders})::int`,
     })
     .from(externalOrderCount)
     .where(and(eq(externalOrderCount.outletId, outletId), gte(externalOrderCount.weekStart, fromDate), lt(externalOrderCount.weekStart, toDate)))
-  return row?.v ?? 0
+    .orderBy(externalOrderCount.weekStart)
 }
 
 export async function topCustomers(outletId: string, from: Date, to: Date, limit = 5) {

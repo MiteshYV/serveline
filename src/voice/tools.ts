@@ -17,7 +17,7 @@ import { z } from 'zod'
 import { vendorMode } from '../adapters/mode.ts'
 import { sms } from '../adapters/sms/index.ts'
 import { placeOrder, resolveCode } from '../checkout/place-order.ts'
-import { CartError, priceCart, type CartItemInput } from '../core/cart.ts'
+import { CartError, priceCart, type CartItemInput, type PricedMenuItem } from '../core/cart.ts'
 import { NOTICE_VERSION, hasValidConsent } from '../core/consent.ts'
 import { checkServiceability } from '../core/serviceability.ts'
 import {
@@ -82,19 +82,51 @@ const AI: Actor = { type: 'ai', id: null }
 /** For reading aloud: "120" or "120.50". Money stays paise everywhere else (CLAUDE.md). */
 const rupees = (p: number): string => (p % 100 === 0 ? String(p / 100) : (p / 100).toFixed(2))
 
+/**
+ * What the SMS `placeOrder` sent cost this call (call-cost-misses-the-sms-the-call-sent).
+ * `placeOrder` logs each message's cost in `sms_message` but does not yet report the total back to
+ * its caller; until src/checkout/place-order.ts does, this reads zero rather than guessing at a
+ * segment count, and starts reporting the true figure the moment that field lands.
+ */
+const smsPaiseOf = (result: object): number =>
+  'smsPaise' in result && typeof result.smsPaise === 'number' ? result.smsPaise : 0
+
 const pageUrl = (deps: ToolDeps) => `${deps.origin}/r/${deps.restaurant.slug}`
 
+/** The published menu as core prices against, or null when the outlet has none published. */
+async function livePricedMenu(deps: ToolDeps): Promise<PricedMenuItem[] | null> {
+  const menu = await getPublishedMenu(deps.outlet.id)
+  return menu ? toPricedMenu(menu) : null
+}
+
 /**
- * The cart as the model reads it back: names, quantities, the total in rupees. Priced by core
- * against the items `search_menu` returned this call, with the applied code resolved again by
- * the same function `placeOrder` will use, so the read-back total is the total that gets charged.
+ * The cart as the model reads it back: names, quantities, the total in rupees.
+ *
+ * read-back-total-is-not-the-charged-total: priced against the **live** published menu — the same
+ * list `placeOrder` prices against — and never against what `search_menu` returned earlier in the
+ * call, because a price edited from the dashboard lands live (src/db/repos/menu.ts) and the caller
+ * must not agree to one total and be charged another (Build Spec §5.2: the read-back is the thing
+ * the caller says yes to). The §5.3 grounding gate stays `session.seenItemIds`, which holds ids,
+ * not prices, so there is no snapshot left to diverge.
+ *
+ * A `ToolResult`, not a plain object: pricing against the live menu can now fail mid-call — an item
+ * withdrawn or sold out since it was searched — and the model should tell the caller the dish has
+ * just gone, not have the call die (M2 design "Error handling").
  */
-async function cartSummary(session: Session, deps: ToolDeps) {
+async function cartSummary(session: Session, deps: ToolDeps, menu?: PricedMenuItem[]): Promise<ToolResult> {
+  const priced = menu ?? (await livePricedMenu(deps))
+  if (!priced) return refuse('menu_unavailable')
   const code = session.codeText
     ? await resolveCode(deps.restaurant.id, session.codeText, deps.customer?.id ?? null)
     : null
-  const cart = priceCart(session.cart, [...session.searchResults.values()], code?.ok ? { percent: code.percent } : undefined)
-  return {
+  let cart
+  try {
+    cart = priceCart(session.cart, priced, code?.ok ? { percent: code.percent } : undefined)
+  } catch (error) {
+    if (error instanceof CartError) return refuse(error.code)
+    throw error
+  }
+  return ok({
     lines: cart.lines.map((l) => ({
       lineId: l.id, name: l.itemName, variant: l.variantName, options: l.optionNames, qty: l.qty,
       lineRupees: rupees(l.linePaise), linePaise: l.linePaise,
@@ -104,7 +136,7 @@ async function cartSummary(session: Session, deps: ToolDeps) {
     discountPaise: cart.discountPaise,
     totalPaise: cart.totalPaise,
     totalRupees: rupees(cart.totalPaise),
-  }
+  })
 }
 
 // Menu search. ponytail: lower-cased tokens with a small edit-distance tolerance is the ceiling —
@@ -163,17 +195,16 @@ export async function hasOrderConsent(customerId: string, restaurantId: string):
 const handlers: { [K in ToolName]: Handler<K> } = {
   async search_menu({ query }, session, deps) {
     // `language` is accepted for the M4 vocabulary; the M2 matcher above is language-blind.
-    const menu = await getPublishedMenu(deps.outlet.id)
-    if (!menu) return refuse('menu_unavailable')
-    const ranked = toPricedMenu(menu)
+    const priced = await livePricedMenu(deps)
+    if (!priced) return refuse('menu_unavailable')
+    const ranked = priced
       .map((item) => ({ item, score: matchScore(query, item.name) }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name))
       .slice(0, 6)
-    for (const { item } of ranked) {
-      session.searchResults.set(item.id, item)
-      session.seenItemIds.add(item.id)
-    }
+    // Ids only: what was shown is a grounding record, never a price the cart is later charged at
+    // (read-back-total-is-not-the-charged-total).
+    for (const { item } of ranked) session.seenItemIds.add(item.id)
     return ok({
       items: ranked.map(({ item }) => ({
         id: item.id,
@@ -195,14 +226,17 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     // it never supplies either.
     if (!session.seenItemIds.has(args.item_id)) return refuse('item_not_searched')
     const line: CartItemInput = { itemId: args.item_id, variantId: args.variant_id, optionIds: args.option_ids ?? [], qty: args.qty }
+    // Tried against the live menu, and the read-back below is priced from the same list.
+    const priced = await livePricedMenu(deps)
+    if (!priced) return refuse('menu_unavailable')
     try {
-      priceCart([...session.cart, line], [...session.searchResults.values()])
+      priceCart([...session.cart, line], priced)
     } catch (error) {
       if (error instanceof CartError) return refuse(error.code)
       throw error
     }
     session.cart.push(line)
-    return ok(await cartSummary(session, deps))
+    return cartSummary(session, deps, priced)
   },
 
   async remove_from_cart({ line_id }, session, deps) {
@@ -210,18 +244,20 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     const index = Number(line_id.slice('line-'.length)) - 1
     if (!(index >= 0 && index < session.cart.length)) return refuse('unknown_line')
     session.cart.splice(index, 1)
-    return ok(await cartSummary(session, deps))
+    return cartSummary(session, deps)
   },
 
   async get_cart(_args, session, deps) {
-    return ok(await cartSummary(session, deps))
+    return cartSummary(session, deps)
   },
 
   async apply_code({ code }, session, deps) {
     const outcome = await resolveCode(deps.restaurant.id, code, deps.customer?.id ?? null)
     if (!outcome.ok) return refuse(outcome.reason)
     session.codeText = outcome.code
-    return ok({ code: outcome.code, percent: outcome.percent, cart: await cartSummary(session, deps) })
+    const cart = await cartSummary(session, deps)
+    if (!cart.ok) return cart
+    return ok({ code: outcome.code, percent: outcome.percent, cart: cart.data })
   },
 
   async check_serviceability({ area, pincode }, _session, deps) {
@@ -292,9 +328,14 @@ const handlers: { [K in ToolName]: Handler<K> } = {
     if (!deps.customer) return refuse('customer_required')
     if (!agreed) return ok({ agreed: false })
     if (await hasOrderConsent(deps.customer.id, deps.restaurant.id)) return ok({ agreed: true, already: true })
-    // The caller cannot agree to words they were never read. The loop sets this when the notice
-    // actually goes out (src/voice/notice.ts noticeWasRead); until then there is nothing to record.
-    if (!session.noticeRead) return refuse('notice_not_read')
+    // The caller cannot agree to words they were never read, and cannot agree in the same breath
+    // they were read in. The loop stamps the turn the notice actually went out in (notice.ts
+    // `noticeWasRead`); requiring a strictly earlier turn means the caller has spoken since
+    // (consent-recorded-without-an-answer). ADR 0005: consent recorded without the notice — or
+    // without an answer — is not consent.
+    if (session.noticeReadAtTurn === undefined || session.noticeReadAtTurn >= session.turnCount) {
+      return refuse('notice_not_read')
+    }
     await recordConsent({
       customerId: deps.customer.id,
       restaurantId: deps.restaurant.id,
@@ -308,6 +349,14 @@ const handlers: { [K in ToolName]: Handler<K> } = {
   },
 
   async place_order({ fulfilment, payment_method }, session, deps) {
+    /**
+     * One call places one order (place-order-not-idempotent-per-call, voice-place-order-not-
+     * idempotent). A retried tool call, a dropped result or a caller asking "did that go through?"
+     * must not cook the food twice or leave two live payment links for it. The reason is
+     * machine-readable so the model can say it and route any change to `transfer_to_human`, which
+     * is what the prompt already tells it to do with an order that is already placed.
+     */
+    if (session.orderId) return refuse('order_already_placed', { orderId: session.orderId })
     // The read-back (Build Spec §5.2) is the prompt's rule; the one thing checked here is that
     // there is something to place, so the model gets a reason rather than placeOrder's.
     if (session.cart.length === 0) return refuse('empty_cart')
@@ -329,11 +378,21 @@ const handlers: { [K in ToolName]: Handler<K> } = {
       origin: deps.origin,
     })
     if (!result.ok) return refuse(result.reason, result.code)
+    // Only on success: the consent detour refuses `consent_required`, reads the notice and retries
+    // (Build Spec §10), and so do the `empty_cart` and `address_required` refusals above. The cart
+    // goes with it, so nothing stale can be re-placed or parked by a later handoff.
+    session.orderId = result.orderId
+    session.cart = []
+    session.codeText = null
     const order = await getOrder(result.orderId)
     if (!order) throw new Error(`Order ${result.orderId} vanished after placeOrder`)
     return ok({
       orderId: order.id,
       totalPaise: order.totalPaise,
+      // call-cost-misses-the-sms-the-call-sent: the payment_link / order_confirm / address_link
+      // messages placeOrder sends belong in this call's `call_cost.sms_paise`, so the loop adds
+      // whatever comes back here to its ledger — the same way `send_sms` reports its own cost.
+      smsPaise: smsPaiseOf(result),
       // What the caller should be told went to their phone (Build Spec §5.2).
       addressPending: result.addressPending,
       totalRupees: rupees(order.totalPaise),

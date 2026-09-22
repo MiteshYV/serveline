@@ -21,6 +21,17 @@ export function istDayStart(d: Date): Date {
   return new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()) - IST_OFFSET_MS)
 }
 
+/**
+ * Milliseconds from `d` until the IST calendar day after it begins. Always positive, so a timer
+ * armed with it never fires immediately and never stalls.
+ *
+ * Finding orders-today-never-resets-at-midnight: a long-lived client (the counter tablet) has to
+ * find the day boundary from the clock, because nothing re-renders it there.
+ */
+export function msToNextIstDayStart(d: Date): number {
+  return istDayStart(d).getTime() + 86_400_000 - d.getTime()
+}
+
 /** The instant at which the IST calendar month containing `d` began, shifted by `monthsAgo`. */
 export function istMonthStart(d: Date, monthsAgo = 0): Date {
   const s = shifted(d)

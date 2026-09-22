@@ -12,7 +12,7 @@
  */
 
 import { vendorMode } from '../adapters/mode.ts'
-import { payments } from '../adapters/payments/index.ts'
+import { closeLinks, payments } from '../adapters/payments/index.ts'
 import { sms } from '../adapters/sms/index.ts'
 import { CartError, priceCart, type CartErrorCode, type CartItemInput } from '../core/cart.ts'
 import { canRedeem, type RedemptionRefusal } from '../core/codes.ts'
@@ -20,8 +20,8 @@ import { hasValidConsent } from '../core/consent.ts'
 import { paise, type Paise } from '../core/money.ts'
 import {
   attachPayment, countPriorRedemptions, createOrder, getCodeByText, getConsent, getPublishedMenu,
-  listAddresses, logSms, recordRedemption, toPricedMenu, transitionOrder, upsertCustomerRestaurant,
-  type Actor,
+  listAddresses, logSms, recordRedemption, supersedeOutstandingPayments, toPricedMenu,
+  transitionOrder, upsertCustomerRestaurant, type Actor,
 } from '../db/repos/index.ts'
 import type { customer, outlet, restaurant } from '../db/schema/index.ts'
 import type { Lang } from '../ui/i18n.ts'
@@ -104,6 +104,8 @@ export type PlaceOrderResult =
        * caller has to be told that, so the caller's assistant has to be told it first.
        */
       addressPending: boolean
+      /** What the SMS this order sent cost, for `call_cost.sms_paise` when a call placed it. */
+      smsPaise: number
     }
   | { ok: false; reason: PlaceOrderFailure; code?: CodeOutcome & { ok: false } }
 
@@ -214,11 +216,13 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   }, actor)
 
   let paymentUrl: string | null = null
+  // Build Spec §4 `call_cost.sms_paise`: a call's messages belong on that call's ledger.
+  let smsPaise = 0
   if (parked) {
     // Stays `received` and unpaid; the loop moves it to needs_attention and the counter takes it from there.
   } else if (addressPending) {
     await transitionOrder(order.id, 'address_pending', actor)
-    await send(input, 'address_link', {
+    smsPaise += await send(input, 'address_link', {
       restaurant: restaurant.name,
       url: absolute(input.origin, `/r/${restaurant.slug}/address/${await signAddressToken(order.id)}`),
     })
@@ -231,7 +235,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     })
     await attachPayment({ orderId: order.id, gateway: gatewayName(), linkId: link.linkId, amountPaise: cart.totalPaise }, actor)
     paymentUrl = link.url
-    await send(input, 'payment_link', { restaurant: restaurant.name, total: rupees(cart.totalPaise), url: absolute(input.origin, link.url) })
+    smsPaise += await send(input, 'payment_link', { restaurant: restaurant.name, total: rupees(cart.totalPaise), url: absolute(input.origin, link.url) })
   } else if (input.paymentMethod === 'cod' || input.paymentMethod === 'upi_link') {
     // COD confirms at once (the task's reading of Build Spec §6); a zero-total UPI order has
     // nothing to collect, so it confirms too. Pay-at-table stays `received` for the counter.
@@ -239,14 +243,17 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   }
 
   // An `address_pending` order has had its SMS — the link — and is not confirmed to anybody yet.
-  if (!parked && !addressPending) await send(input, 'order_confirm', {
-    restaurant: restaurant.name,
-    items: cart.lines.map((l) => `${l.qty}x ${l.itemName}${l.variantName ? ` (${l.variantName})` : ''}`).join(', '),
-    total: rupees(cart.totalPaise),
-    paymentMode: PAYMENT_MODE[input.paymentMethod][input.lang],
+  // It gets this message when the address is confirmed, from `announceConfirmedOrder` below.
+  if (!parked && !addressPending) smsPaise += await sendOrderConfirm(input, {
+    items: cart.lines.map((l) => ({
+      qty: l.qty,
+      nameSnapshot: `${l.itemName}${l.variantName ? ` (${l.variantName})` : ''}`,
+    })),
+    totalPaise: cart.totalPaise,
+    paymentMethod: input.paymentMethod,
   })
 
-  return { ok: true, orderId: order.id, paymentUrl, addressPending }
+  return { ok: true, orderId: order.id, paymentUrl, addressPending, smsPaise }
 }
 
 /** GSM-7 only (templates.ts): a ₹ would triple the cost of an otherwise-English message. */
@@ -273,6 +280,11 @@ export async function issuePaymentLink(input: {
   const { order, restaurant, customer, lang, origin, actor } = input
   if (order.paymentMethod !== 'upi_link' || order.totalPaise <= 0 || order.paymentStatus === 'paid') return null
 
+  // Any link already out for this order stops being the truth the moment a new one is minted, so
+  // it is closed at the gateway first. Until this ran, a customer holding two SMSes could pay
+  // both and be charged twice (bug hunt: superseded-payment-link-still-payable).
+  await closeLinks(await supersedeOutstandingPayments(order.id, actor))
+
   const link = await payments().createLink({
     orderId: order.id,
     amountPaise: order.totalPaise,
@@ -288,11 +300,73 @@ export async function issuePaymentLink(input: {
   return link.url
 }
 
+/**
+ * Everything an `address_pending` order is owed once the customer has confirmed where it goes:
+ * the `order_confirm` SMS that placement withheld, and — for a UPI order — the payment link
+ * withheld with it (Build Spec §5.2, §9). Returns the payment link's url, or null.
+ *
+ * Both messages, not just the link: a COD delivery taken by voice never passes through the
+ * placement-time send, so this is the only written record of items, total and payment mode its
+ * customer ever gets — and that customer phoned precisely because they could not read a menu
+ * (bug hunt: address-pending-order-never-confirmed-by-sms).
+ *
+ * `totalPaise` is the order's, not a re-priced cart: it is the discounted total actually charged.
+ */
+export async function announceConfirmedOrder(input: {
+  order: {
+    id: string
+    totalPaise: number
+    paymentMethod: 'upi_link' | 'cod' | 'pay_at_table'
+    paymentStatus: string
+    items: readonly { qty: number; nameSnapshot: string }[]
+  }
+  restaurant: { id: string; name: string }
+  customer: { phone: string; phoneHash: string }
+  lang: Lang
+  origin: string
+  actor: Actor
+}): Promise<string | null> {
+  const { order, restaurant, customer, lang } = input
+  await sendOrderConfirm({ restaurant, customer, lang }, {
+    items: order.items,
+    totalPaise: order.totalPaise,
+    paymentMethod: order.paymentMethod,
+  })
+  return issuePaymentLink(input)
+}
+
+/**
+ * Build Spec §9's confirmation: items, total and payment mode. One place, so the wording cannot
+ * drift between an order confirmed at placement and one confirmed after its address was.
+ */
+async function sendOrderConfirm(
+  target: SmsTarget,
+  order: {
+    items: readonly { qty: number; nameSnapshot: string }[]
+    totalPaise: number
+    paymentMethod: PlaceOrderInput['paymentMethod']
+  },
+): Promise<number> {
+  return send(target, 'order_confirm', {
+    restaurant: target.restaurant.name,
+    items: order.items.map((i) => `${i.qty}x ${i.nameSnapshot}`).join(', '),
+    total: rupees(paise(order.totalPaise)),
+    paymentMode: PAYMENT_MODE[order.paymentMethod][target.lang],
+  })
+}
+
 const gatewayName = () => (vendorMode() === 'mock' ? 'mock' : 'razorpay')
 
-/** The SMS's payment-mode word. Interim Hindi and Kannada, like the templates themselves. */
+/**
+ * The SMS's payment-mode word. Interim Hindi and Kannada, like the templates themselves.
+ *
+ * Build Spec §9 asks the confirmation to carry the payment *mode*. `upi_link` therefore names
+ * the mode and asserts nothing: the message goes out while the order is `awaiting_payment`, and
+ * the customer who read "paid by UPI" stopped there and never paid (bug hunt:
+ * order-confirm-sms-claims-unpaid-order-is-paid).
+ */
 const PAYMENT_MODE: Record<PlaceOrderInput['paymentMethod'], Record<Lang, string>> = {
-  upi_link: { en: 'paid by UPI', hi: 'UPI se bhugtan', kn: 'UPI paavati' },
+  upi_link: { en: 'pay by UPI link', hi: 'UPI link se bhugtan', kn: 'UPI link mulaka paavati' },
   cod: { en: 'cash on delivery', hi: 'delivery par nakad', kn: 'delivery nagadu' },
   pay_at_table: { en: 'pay at the table', hi: 'table par bhugtan', kn: 'table paavati' },
 }
@@ -308,11 +382,12 @@ type SmsTarget = {
   lang: Lang
 }
 
+/** Returns what the message cost in paise, or 0 if it did not go — the voice ledger adds it up. */
 async function send(
   input: SmsTarget,
   kind: 'order_confirm' | 'payment_link' | 'address_link',
   vars: Record<string, string>,
-): Promise<void> {
+): Promise<number> {
   const provider = vendorMode() === 'mock' ? 'mock' : 'exotel'
   try {
     const sent = await sms().send({ toPhone: input.customer.phone, kind, language: input.lang, vars })
@@ -326,9 +401,11 @@ async function send(
       costPaise: sent.costPaise,
       sentAt: new Date(),
     })
+    return sent.costPaise
   } catch (error) {
     console.error(`[checkout] ${kind} SMS failed for restaurant ${input.restaurant.id}:`, error instanceof Error ? error.message : error)
     await logSms({ restaurantId: input.restaurant.id, toPhoneHash: input.customer.phoneHash, kind, provider, status: 'failed' })
       .catch(() => undefined)
+    return 0
   }
 }

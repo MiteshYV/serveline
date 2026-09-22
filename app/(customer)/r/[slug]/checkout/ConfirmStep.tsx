@@ -47,6 +47,22 @@ const FAILURE_KEY: Record<Exclude<PlaceOrderActionResult, { ok: true }>['reason'
   invalid_qty: 'checkout.itemUnavailable',
   min_select: 'checkout.itemUnavailable',
   max_select: 'checkout.itemUnavailable',
+  // Finding negative-unit-price-cart: a menu row priced below zero. The dish cannot be ordered
+  // until the restaurant fixes its price, which is what this string already tells the diner.
+  invalid_price: 'checkout.itemUnavailable',
+}
+
+/**
+ * Finding refused-code-blocks-order. Build Spec §6 line 298: a second scan of a Direct Order Card
+ * "shows the menu without the discount and says so" — the *redemption* is refused, not the order.
+ * `placeOrder` refuses the whole order for as long as `c=` rides in the query, so a code that has
+ * been refused is dropped from what the next submit sends. The Band still explains the refusal;
+ * the button now prices at full instead of failing for ever.
+ */
+const withoutCode = (query: string) => {
+  const params = new URLSearchParams(query)
+  params.delete('c')
+  return params.toString()
 }
 
 /**
@@ -62,9 +78,20 @@ export function ConfirmStep({ slug, qs, contextKey, lang, ctx, categories, code:
   const [method, setMethod] = useState<Method>(ctx.kind === 'table' ? 'pay_at_table' : 'upi_link')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dropped, setDropped] = useState(false)
+  // A code already refused at page render never goes back to the server (see `withoutCode`).
+  const [query, setQuery] = useState(() => (initialCode && !initialCode.ok ? withoutCode(qs) : qs))
 
   useEffect(() => {
-    setLines(prune(loadCart(key), priced))
+    const loaded = loadCart(key)
+    const kept = prune(loaded, priced)
+    setLines(kept)
+    // Finding unpriceable-cart-line-kills-cart: the drop is written back and said out loud, rather
+    // than leaving a dead line in storage behind "Your cart is empty".
+    if (kept.length !== loaded.length) {
+      saveCart(key, kept)
+      setDropped(true)
+    }
   }, [key, priced])
 
   const cart = useMemo(() => {
@@ -90,7 +117,7 @@ export function ConfirmStep({ slug, qs, contextKey, lang, ctx, categories, code:
     let result: PlaceOrderActionResult
     try {
       result = await placeOrderAction({
-        slug, qs, items: lines, paymentMethod: method, ...(address ? { addressId: address.id } : {}),
+        slug, qs: query, items: lines, paymentMethod: method, ...(address ? { addressId: address.id } : {}),
       })
     } catch {
       setBusy(false)
@@ -105,6 +132,10 @@ export function ConfirmStep({ slug, qs, contextKey, lang, ctx, categories, code:
     setBusy(false)
     if (result.reason === 'code_refused' && result.code) {
       // Build Spec §6: shown without the discount, and told why. The total above re-renders.
+      // The refusal can only have come from the lost race in place-order.ts (the code was live
+      // when the page rendered and another tab redeemed it in between), so the code is dropped
+      // from the query too and the customer's next tap goes through at full price.
+      setQuery(withoutCode)
       setCode(result.code)
       setError(codeMessage(result.code, lang))
       return
@@ -119,6 +150,7 @@ export function ConfirmStep({ slug, qs, contextKey, lang, ctx, categories, code:
   if (!cart || lines.length === 0) {
     return (
       <div className={styles.form}>
+        {dropped && <Band tone="attention">{t('checkout.itemUnavailable', lang)}</Band>}
         <p className={styles.note}>{t('cart.empty', lang)}</p>
         <Button href={menuHref} variant="brand" block>{t('checkout.backToMenu', lang)}</Button>
       </div>
@@ -129,6 +161,8 @@ export function ConfirmStep({ slug, qs, contextKey, lang, ctx, categories, code:
 
   return (
     <div className={styles.form}>
+      {dropped && <Band tone="attention">{t('checkout.itemUnavailable', lang)}</Band>}
+
       <section className={styles.card} aria-labelledby="items-h">
         <h3 id="items-h" className={styles.subhead}>{t('checkout.items', lang)}</h3>
         <ul className={styles.lines}>
