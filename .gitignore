@@ -33,3 +33,8 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# knowledge graph — outputs are committed, the machine-local bits are not
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/cache/
