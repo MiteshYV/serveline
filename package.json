@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --experimental-strip-types src/db/migrate.ts",
     "db:seed": "NODE_ENV=${NODE_ENV:-development} node --experimental-strip-types src/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "eval": "node --experimental-strip-types src/voice/eval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
