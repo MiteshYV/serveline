@@ -11,9 +11,14 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { z } from 'zod'
-import { getRestaurantBySlug } from '../db/repos/index.ts'
+import { phonePepper } from '../auth/secrets.ts'
+import { SYSTEM } from '../db/repos/_actor.ts'
+import { NOTICE_VERSION } from '../core/consent.ts'
+import { hashPhone } from '../core/phone.ts'
+import { getConsent, getRestaurantBySlug, recordConsent, upsertCustomer } from '../db/repos/index.ts'
 import type { Lang } from '../ui/i18n.ts'
 import { endCall, startCall, takeTurn } from './loop.ts'
+import { hoursToday } from './prompt.ts'
 
 const ExpectedItem = z.object({
   name: z.string(),
@@ -72,9 +77,9 @@ type Outcome = {
   got: string
 }
 
-async function runCase(outletId: string, lang: Lang, origin: string, c: EvalCase, failoversBefore: () => number): Promise<Outcome> {
+async function runCase(outletId: string, phoneHash: string, lang: Lang, origin: string, c: EvalCase, failoversBefore: () => number): Promise<Outcome> {
   const before = failoversBefore()
-  const started = await startCall({ outletId, transport: 'browser', lang, origin })
+  const started = await startCall({ outletId, transport: 'browser', lang, origin, customerPhoneHash: phoneHash })
   const t = performance.now()
   let turn: Awaited<ReturnType<typeof takeTurn>>
   try {
@@ -118,12 +123,45 @@ if (!restaurant) throw new Error('No demo restaurant: run `npm run db:seed` firs
 const outlet = restaurant.outlets[0]
 if (!outlet) throw new Error('The demo restaurant has no outlet')
 
+/**
+ * A caller with consent and no history: a call with no identity at all is told in its prompt that
+ * it cannot place an order (loop.ts `anonymous`), which would score every order case as a refusal
+ * and measure nothing. One with a usual order would be greeted with "same as last time", which
+ * would steer the first turn. This customer is neither — the same one every run, so the score is
+ * comparable across runs.
+ */
+async function evalCaller(restaurantId: string): Promise<string> {
+  const phone = '+919900009999'
+  const phoneHash = hashPhone(phone, phonePepper())
+  // No name: customers.ts requires a consent before one, and a greeting that says it would
+  // steer the first turn, which is the turn being measured.
+  const customer = await upsertCustomer({ phone, phoneHash }, SYSTEM)
+  if (!(await getConsent(customer.id, restaurantId))) {
+    await recordConsent({
+      customerId: customer.id, restaurantId, noticeVersion: NOTICE_VERSION,
+      purposes: ['order_fulfilment', 'order_history'], channel: 'call', language: 'en',
+      evidence: { source: 'voice-eval' },
+    }, SYSTEM)
+  }
+  return phoneHash
+}
+
 // A failover means the model did not answer; those cases are excluded rather than scored.
 let failovers = 0
 const warn = console.warn
 console.warn = (...a: unknown[]) => { if (String(a[0]).includes('model failed')) failovers++; else warn(...a) }
 
-const dir = join(process.cwd(), 'contracts', 'voice-eval')
+// §16 wants the same answer on every run. An outlet that is shut declines orders for a reason
+// that has nothing to do with recognition, so a run then would not be a measurement.
+const open = hoursToday(outlet, new Date())
+if (open.startsWith('closed') || open === 'not on record') {
+  console.error(`The demo outlet is ${open} — every order case would be declined for the wrong reason.`)
+  console.error('Run inside its hours, or change them in src/db/seed.ts and re-seed.')
+  process.exit(1)
+}
+const phoneHash = await evalCaller(restaurant.id)
+
+const dir = flag('dir') ?? join(process.cwd(), 'contracts', 'voice-eval')
 const only = flag('lang')
 const limit = Number(flag('limit') ?? Infinity)
 const gap = Number(flag('gap') ?? 0)
@@ -145,7 +183,7 @@ for (const file of files.sort()) {
   console.log(`## ${suite.language} — ${cases.length} cases`)
   for (const c of cases) {
     if (gap) await sleep(gap)
-    const r = await runCase(outlet.id, suite.language, 'http://localhost:3000', c, () => failovers)
+    const r = await runCase(outlet.id, phoneHash, suite.language, 'http://localhost:3000', c, () => failovers)
     results.push(r)
     const mark = r.errored ? '!' : r.itemOk === false || !r.intentOk ? '✗' : '✓'
     console.log(`  ${mark} ${r.case.id.padEnd(22)} ${String(Math.round(r.ms)).padStart(6)}ms  ${r.case.say}`)

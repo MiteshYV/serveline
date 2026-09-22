@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "language": "kn",
+  "cases": [
+    {
+      "id": "kn-order-one-dosa",
+      "say": "ಹಲೋ, ಒಂದು ಮಸಾಲ ದೋಸೆ ಕೊಡಿ.",
+      "why": "the simplest order, one dish named in Kannada",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Masala Dosa",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-two-dishes",
+      "say": "ಎರಡು ಇಡ್ಲಿ ವಡೆ ಮತ್ತು ಒಂದು ಖಾರಾ ಬಾತ್ ಕೊಡಿ.",
+      "why": "two dishes joined by ಮತ್ತು, each with its own quantity",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Idli Vada",
+            "qty": 2
+          },
+          {
+            "name": "Khara Bath",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-qty-in-words",
+      "say": "ಮೂರು ಮೆದು ವಡೆ ಬೇಕು ಅಣ್ಣ.",
+      "why": "a quantity spelled as a Kannada word, with the usual ಅಣ್ಣ",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Medu Vada",
+            "qty": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-qty-in-digits",
+      "say": "2 ಸೆಟ್ ದೋಸೆ, 1 ರವಾ ಇಡ್ಲಿ ಪಾರ್ಸೆಲ್ ಮಾಡಿ.",
+      "why": "quantities as digits, the way a recogniser usually returns them",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Set Dosa",
+            "qty": 2
+          },
+          {
+            "name": "Rava Idli",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-long",
+      "say": "ಎರಡು ಮಸಾಲ ದೋಸೆ, ಒಂದು ಇಡ್ಲಿ ವಡೆ, ಒಂದು ಸೆಟ್ ದೋಸೆ, ಎರಡು ಬಾದಾಮ್ ಹಾಲು ಮತ್ತು ನಾಲ್ಕು ತಂದೂರಿ ರೊಟ್ಟಿ — ಅಷ್ಟೇ.",
+      "why": "five lines in one breath, the order a whole table gives",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Masala Dosa",
+            "qty": 2
+          },
+          {
+            "name": "Idli Vada",
+            "qty": 1
+          },
+          {
+            "name": "Set Dosa",
+            "qty": 1
+          },
+          {
+            "name": "Badam Milk",
+            "qty": 2
+          },
+          {
+            "name": "Tandoori Roti",
+            "qty": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-chai",
+      "say": "ಎರಡು ಮಸಾಲ ಚಾಯ್ ಕೊಡಿ, ಪಾರ್ಸೆಲ್.",
+      "why": "a beverage that takes no variant, plus the parcel habit",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Masala Chai",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-veg-biryani",
+      "say": "ಒಂದು ವೆಜ್ ಬಿರಿಯಾನಿ ಮತ್ತು ಎರಡು ಬಟರ್ ನಾನ್.",
+      "why": "a biryani that must not be confused with the two non-veg ones",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Veg Biryani",
+            "qty": 1
+          },
+          {
+            "name": "Butter Naan",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-curd-rice",
+      "say": "ಒಂದು ಮೊಸರನ್ನ ಮತ್ತು ಒಂದು ಮಜ್ಜಿಗೆ ಸಾಕು.",
+      "why": "the Kannada names for two dishes the menu lists in English",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Curd Rice",
+            "qty": 1
+          },
+          {
+            "name": "Buttermilk (Majjige)",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-kurma-parotta",
+      "say": "ಒಂದು ಮಿಕ್ಸ್ ವೆಜ್ ಕುರ್ಮಾ ಜೊತೆಗೆ ಎರಡು ಪ್ಲೇಟ್ ಕೇರಳ ಪರೋಟ ಕೊಡಿ.",
+      "why": "two plates, said as plates: the item is named \"(2 pcs)\", so a bare \"two parotta\" is a count of pieces to a caller and a count of orders to the menu",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Mixed Veg Kurma",
+            "qty": 1
+          },
+          {
+            "name": "Kerala Parotta (2 pcs)",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-two-baths",
+      "say": "ಒಂದು ಬಿಸಿ ಬೇಳೆ ಬಾತ್, ಒಂದು ಚೌ ಚೌ ಬಾತ್ ಪಾರ್ಸೆಲ್ ಮಾಡಿ ಕೊಡಿ.",
+      "why": "two dishes ending in the same word, which a matcher can collapse",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Bisi Bele Bath",
+            "qty": 1
+          },
+          {
+            "name": "Chow Chow Bath",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-mutton-biryani",
+      "say": "ಒಂದು ಮಟನ್ ಬಿರಿಯಾನಿ ಪಾರ್ಸೆಲ್ ಮಾಡಿ.",
+      "why": "the one biryani with neither a variant nor a required option",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Mutton Biryani",
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-tikka-naan",
+      "say": "ಒಂದು ಚಿಕನ್ ಟಿಕ್ಕಾ ಮಸಾಲ ಮತ್ತು ಮೂರು ಬಟರ್ ನಾನ್ ಕೊಡಿ.",
+      "why": "a three-word chicken dish against the other two on the menu",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Chicken Tikka Masala",
+            "qty": 1
+          },
+          {
+            "name": "Butter Naan",
+            "qty": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-half-paneer",
+      "say": "ಒಂದು ಹಾಫ್ ಪನೀರ್ ಬಟರ್ ಮಸಾಲ ಕೊಡಿ.",
+      "why": "a half portion, named the way a caller names it",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Paneer Butter Masala",
+            "qty": 1,
+            "variant": "Half"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-half-dal-roti",
+      "say": "ಅರ್ಧ ದಾಲ್ ತಡ್ಕಾ ಮತ್ತು ಎರಡು ತಂದೂರಿ ರೊಟ್ಟಿ ಕೊಡಿ.",
+      "why": "ಅರ್ಧ rather than ಹಾಫ್, beside a line that takes no variant",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Dal Tadka",
+            "qty": 1,
+            "variant": "Half"
+          },
+          {
+            "name": "Tandoori Roti",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-full-chicken-curry",
+      "say": "ಚಿಕನ್ ಕರಿ ಒಂದು ಫುಲ್ ಕೊಡಿ ಅಣ್ಣ.",
+      "why": "the full portion, with the size said after the dish",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Chicken Curry",
+            "qty": 1,
+            "variant": "Full"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-large-coffee",
+      "say": "ಎರಡು ದೊಡ್ಡ ಫಿಲ್ಟರ್ ಕಾಫಿ ಕೊಡಿ.",
+      "why": "a size said in Kannada (ದೊಡ್ಡ) that must land on the Large variant",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Filter Coffee",
+            "qty": 2,
+            "variant": "Large"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-extra-ghee",
+      "say": "ಒಂದು ಮಸಾಲ ದೋಸೆ, ತುಪ್ಪ ಎಕ್ಸ್ಟ್ರಾ ಹಾಕಿ.",
+      "why": "an extra asked for in Kannada, which is a priced option not a note",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Masala Dosa",
+            "qty": 1,
+            "options": [
+              "Extra ghee"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-two-extras",
+      "say": "ಎರಡು ಮಸಾಲ ದೋಸೆ, ಚಟ್ನಿ ಜಾಸ್ತಿ ಮತ್ತು ತುಪ್ಪ ಜಾಸ್ತಿ ಹಾಕಿ ಕೊಡಿ.",
+      "why": "both extras on one line, which is the group's maximum",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Masala Dosa",
+            "qty": 2,
+            "options": [
+              "Extra chutney",
+              "Extra ghee"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-order-donne-raita",
+      "say": "ಒಂದು ಚಿಕನ್ ದೊನ್ನೆ ಬಿರಿಯಾನಿ, ರಾಯ್ತಾ ಜೊತೆಗೆ.",
+      "why": "the biryani's required choice, named by the caller in the same turn",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Chicken Donne Biryani",
+            "qty": 1,
+            "options": [
+              "Raita"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "kn-offmenu-gobi",
+      "say": "ಗೋಬಿ ಮಂಚೂರಿ ಇದೆಯಾ? ಎರಡು ಕೊಡಿ.",
+      "why": "a dish the menu does not have; nothing may be substituted into the cart",
+      "intent": "other",
+      "expect": {
+        "items": []
+      }
+    },
+    {
+      "id": "kn-offmenu-sweet",
+      "say": "ಸಿಹಿ ಏನಾದ್ರೂ ಇದೆಯಾ?",
+      "why": "a whole category the menu does not carry",
+      "intent": "other",
+      "expect": {
+        "items": []
+      }
+    },
+    {
+      "id": "kn-offmenu-chicken-65",
+      "say": "ಒಂದು ಚಿಕನ್ 65 ಕೊಡಿ.",
+      "why": "an off-menu dish whose first word matches three real ones",
+      "intent": "other",
+      "expect": {
+        "items": []
+      }
+    },
+    {
+      "id": "kn-enquiry-hours",
+      "say": "ನಿಮ್ಮ ಹೋಟೆಲ್ ಎಷ್ಟು ಹೊತ್ತಿಗೆ ಓಪನ್ ಆಗುತ್ತೆ?",
+      "why": "opening hours must come from the outlet, not from the model",
+      "intent": "enquiry",
+      "expect": {
+        "items": [],
+        "tool": "answer_enquiry"
+      }
+    },
+    {
+      "id": "kn-enquiry-address",
+      "say": "ನಿಮ್ಮ ಹೋಟೆಲ್ ಎಲ್ಲಿದೆ? ಅಡ್ರೆಸ್ ಹೇಳಿ.",
+      "why": "the outlet's own address, asked for plainly",
+      "intent": "enquiry",
+      "expect": {
+        "items": [],
+        "tool": "answer_enquiry"
+      }
+    },
+    {
+      "id": "kn-enquiry-delivery-area",
+      "say": "ಯಾವ ಯಾವ ಏರಿಯಾಗೆ ಡೆಲಿವರಿ ಮಾಡ್ತೀರಾ?",
+      "why": "the delivery area, which is an enquiry and not an address capture",
+      "intent": "enquiry",
+      "expect": {
+        "items": [],
+        "tool": "answer_enquiry"
+      }
+    },
+    {
+      "id": "kn-enquiry-menu",
+      "say": "ನಿಮ್ಮಲ್ಲಿ ಏನೇನು ಸಿಗುತ್ತೆ? ಪೂರ್ತಿ ಮೆನು ಬೇಕಿತ್ತು.",
+      "why": "the whole menu, which is answered with the page and not read aloud",
+      "intent": "enquiry",
+      "expect": {
+        "items": [],
+        "tool": "answer_enquiry"
+      }
+    },
+    {
+      "id": "kn-code-only",
+      "say": "ನನ್ ಹತ್ರ ಒಂದು ಡಿಸ್ಕೌಂಟ್ ಕೋಡ್ ಇದೆ — WELCOME10.",
+      "why": "a code read out before anything is ordered",
+      "intent": "other",
+      "expect": {
+        "items": [],
+        "tool": "apply_code"
+      }
+    },
+    {
+      "id": "kn-code-with-order",
+      "say": "ಎರಡು ಮಸಾಲ ದೋಸೆ ಕೊಡಿ, ಮತ್ತೆ WELCOME10 ಕೋಡ್ ಹಾಕಿ.",
+      "why": "an order and a code in one turn; both must be acted on",
+      "intent": "order",
+      "expect": {
+        "items": [
+          {
+            "name": "Masala Dosa",
+            "qty": 2
+          }
+        ],
+        "tool": "apply_code"
+      }
+    },
+    {
+      "id": "kn-transfer-person",
+      "say": "ಮ್ಯಾನೇಜರ್ ಜೊತೆ ಮಾತಾಡಬೇಕು, ಕೊಡ್ತೀರಾ?",
+      "why": "a caller asking for a person is handed over, not talked round",
+      "intent": "other",
+      "expect": {
+        "items": [],
+        "tool": "transfer_to_human"
+      }
+    },
+    {
+      "id": "kn-transfer-cancel",
+      "say": "ನಾನು ಮಾಡಿದ್ದ ಆರ್ಡರ್ ಕ್ಯಾನ್ಸಲ್ ಮಾಡಬೇಕು.",
+      "why": "a cancellation, which no tool can do, so it goes to the restaurant",
+      "intent": "other",
+      "expect": {
+        "items": [],
+        "tool": "transfer_to_human"
+      }
+    }
+  ]
+}

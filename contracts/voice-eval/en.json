@@ -1,0 +1,230 @@
+{
+  "$comment": "Indian English utterances as a Bangalore caller says them, one per case, scored on a single turn against the seeded demo menu (contracts/voice-eval/README.md). Item names, variants and options are spelled exactly as src/db/seed.ts spells them, because the cart is matched exactly. Nothing here depends on the time of day, the caller's history or anything off the menu, so a verdict is the same every run.",
+  "version": 1,
+  "language": "en",
+  "cases": [
+    {
+      "id": "en-order-one-plate-idli-vada",
+      "say": "One plate idli vada, please.",
+      "why": "the shortest possible order, one dish one quantity",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Idli Vada", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-two-dosas",
+      "say": "I want to order two masala dosas.",
+      "why": "a quantity in words with the dish name pluralised",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Masala Dosa", "qty": 2 }] }
+    },
+    {
+      "id": "en-order-digits",
+      "say": "Send 3 set dosa and 2 medu vada.",
+      "why": "quantities as digits, quantity before the dish, two lines",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Set Dosa", "qty": 3 }, { "name": "Medu Vada", "qty": 2 }] }
+    },
+    {
+      "id": "en-order-words-quantity",
+      "say": "Two plate khara bath and one rava idli.",
+      "why": "quantities in words, with the uncounted 'plate' a caller uses",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Khara Bath", "qty": 2 }, { "name": "Rava Idli", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-greeting-first",
+      "say": "Hello, hello — one mutton biryani only, that's all.",
+      "why": "a greeting and 'only' in front of the order, which must not swallow the dish",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Mutton Biryani", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-filler",
+      "say": "So, actually, make it one veg biryani and one curd rice.",
+      "why": "filler words and a self-correction before the real order",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Veg Biryani", "qty": 1 }, { "name": "Curd Rice", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-long",
+      "say": "Two chicken tikka masala, four butter naan, one veg biryani, two tandoori roti and one curd rice.",
+      "why": "a five-line order in one breath, the length at which a line gets dropped",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Chicken Tikka Masala", "qty": 2 },
+          { "name": "Butter Naan", "qty": 4 },
+          { "name": "Veg Biryani", "qty": 1 },
+          { "name": "Tandoori Roti", "qty": 2 },
+          { "name": "Curd Rice", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "en-order-breads-only",
+      "say": "Give me three butter naan and two tandoori roti.",
+      "why": "two dishes from one category, both counted in pieces",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Butter Naan", "qty": 3 }, { "name": "Tandoori Roti", "qty": 2 }] }
+    },
+    {
+      "id": "en-order-parotta-kurma",
+      "say": "One plate Kerala parotta and one mixed veg kurma.",
+      "why": "an item whose menu name carries a piece count the caller never says",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Kerala Parotta (2 pcs)", "qty": 1 }, { "name": "Mixed Veg Kurma", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-local-names",
+      "say": "One bisibele bath and one majjige.",
+      "why": "the local names a Bangalore caller uses, not the menu's spelling",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Bisi Bele Bath", "qty": 1 }, { "name": "Buttermilk (Majjige)", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-anna",
+      "say": "Anna, two chow chow bath please.",
+      "why": "an address term in front of the order, and a repeated word in the dish name",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Chow Chow Bath", "qty": 2 }] }
+    },
+    {
+      "id": "en-order-beverages",
+      "say": "Two masala chai and one badam milk, that's it.",
+      "why": "beverages only, with a closing phrase that must not be read as a dish",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Masala Chai", "qty": 2 }, { "name": "Badam Milk", "qty": 1 }] }
+    },
+    {
+      "id": "en-order-kindly",
+      "say": "Kindly make it one plate idli vada and two masala chai.",
+      "why": "the polite Indian English opener, with a tiffin and a beverage together",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Idli Vada", "qty": 1 }, { "name": "Masala Chai", "qty": 2 }] }
+    },
+    {
+      "id": "en-order-half-paneer",
+      "say": "Make it a half paneer butter masala and two butter naan.",
+      "why": "a half portion named the way a caller names it, beside an item with no variants",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Paneer Butter Masala", "qty": 1, "variant": "Half" }, { "name": "Butter Naan", "qty": 2 }] }
+    },
+    {
+      "id": "en-order-full-chicken-curry",
+      "say": "One chicken curry full and three tandoori roti.",
+      "why": "the size said after the dish, and the full portion chosen explicitly",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Chicken Curry", "qty": 1, "variant": "Full" }, { "name": "Tandoori Roti", "qty": 3 }] }
+    },
+    {
+      "id": "en-order-large-coffee",
+      "say": "Two filter coffee, large size both.",
+      "why": "one size applied to a quantity of two, which must stay one line",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Filter Coffee", "qty": 2, "variant": "Large" }] }
+    },
+    {
+      "id": "en-order-extra-ghee",
+      "say": "Two masala dosa with extra ghee, please.",
+      "why": "an optional extra that must reach the line, not just the reply",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Masala Dosa", "qty": 2, "options": ["Extra ghee"] }] }
+    },
+    {
+      "id": "en-order-biryani-raita",
+      "say": "One chicken donne biryani with raita, not salan.",
+      "why": "a required choice named in the utterance, with the other choice explicitly refused",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Chicken Donne Biryani", "qty": 1, "options": ["Raita"] }] }
+    },
+    {
+      "id": "en-order-dosa-plus-extra-chutney",
+      "say": "One masala dosa, extra chutney also, and one large filter coffee.",
+      "why": "an option on one line and a size on another in the same utterance",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Masala Dosa", "qty": 1, "options": ["Extra chutney"] },
+          { "name": "Filter Coffee", "qty": 1, "variant": "Large" }
+        ]
+      }
+    },
+    {
+      "id": "en-offmenu-gobi",
+      "say": "Do you have gobi manchurian?",
+      "why": "a dish the menu does not carry — nothing may be added and nothing invented",
+      "intent": "other",
+      "expect": { "items": [] }
+    },
+    {
+      "id": "en-offmenu-sweet",
+      "say": "Anything sweet is there? Some dessert like that.",
+      "why": "a whole category the menu does not carry, asked without naming a dish",
+      "intent": "other",
+      "expect": { "items": [] }
+    },
+    {
+      "id": "en-offmenu-chicken-65",
+      "say": "Two plates of chicken 65, make it fast.",
+      "why": "an off-menu dish ordered outright, where the tempting failure is to add a chicken dish anyway",
+      "intent": "other",
+      "expect": { "items": [] }
+    },
+    {
+      "id": "en-enquiry-hours",
+      "say": "What time do you close in the night?",
+      "why": "opening hours must come from the outlet's settings, not from the model",
+      "intent": "enquiry",
+      "expect": { "tool": "answer_enquiry" }
+    },
+    {
+      "id": "en-enquiry-delivery-area",
+      "say": "Which all areas do you deliver to?",
+      "why": "the delivery area is an enquiry, answered in one turn",
+      "intent": "enquiry",
+      "expect": { "tool": "answer_enquiry" }
+    },
+    {
+      "id": "en-enquiry-address",
+      "say": "Where is your shop exactly? I'll come and collect itself.",
+      "why": "an address enquiry, with a pickup mention that must not start an order",
+      "intent": "enquiry",
+      "expect": { "tool": "answer_enquiry" }
+    },
+    {
+      "id": "en-enquiry-menu",
+      "say": "First time I'm calling — what all do you have?",
+      "why": "an open menu question, which is answered rather than guessed at dish by dish",
+      "intent": "enquiry",
+      "expect": { "tool": "answer_enquiry" }
+    },
+    {
+      "id": "en-code-with-order",
+      "say": "I have one card here with WELCOME10 written on it, apply that. And one veg biryani.",
+      "why": "a discount code and an order in the same breath — both must land",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Veg Biryani", "qty": 1 }], "tool": "apply_code" }
+    },
+    {
+      "id": "en-code-only",
+      "say": "On the card there is one code, WELCOME10 — is it still working?",
+      "why": "a code checked before anything is ordered, which must not put a dish in the cart",
+      "intent": "other",
+      "expect": { "tool": "apply_code" }
+    },
+    {
+      "id": "en-transfer-person",
+      "say": "Can you put the manager on the line? I want to talk to a person.",
+      "why": "a caller asking for a human is handed off, not talked out of it",
+      "intent": "other",
+      "expect": { "tool": "transfer_to_human" }
+    },
+    {
+      "id": "en-transfer-cancel",
+      "say": "I ordered half an hour back, I want to cancel that order.",
+      "why": "cancelling an existing order is beyond the assistant's tools, so it hands off",
+      "intent": "other",
+      "expect": { "tool": "transfer_to_human" }
+    }
+  ]
+}

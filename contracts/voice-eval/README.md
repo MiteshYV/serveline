@@ -48,3 +48,25 @@ Every case runs as its own call against the seeded demo menu, so cases never int
 fraction classified correctly. `errored` cases are ones where the model failed (a rate limit, an
 outage) rather than answered wrongly; they are excluded from both, and a run with many of them is
 not a measurement.
+
+## Baseline
+
+Gemini 3.5 Flash Lite (ADR 0006), 22 September 2026, 90 cases:
+
+| | item accuracy | intent accuracy | p50 | p95 |
+|---|---|---|---|---|
+| English | 100% (17/17) | 96% (23/24) | 4.1 s | 5.3 s |
+| Hindi | 100% (26/26) | 96% (25/26) | 4.2 s | 5.4 s |
+| Kannada | 96% (23/24) | 100% (24/24) | 5.0 s | 7.7 s |
+
+Against §16's targets — 85% at M2, 92% at M3 — with room. Three caveats, all of which matter more
+than the number:
+
+- **16 of 90 cases errored on a rate limit**, not on an answer, and are excluded. Roughly a fifth of
+  the set did not run. A paid key would measure all of it.
+- **This is text.** No recogniser, no phone line, no kitchen noise. The number that decides a pilot
+  is this set read aloud by five people, and it will be lower.
+- **The failures were worth more than the score.** Two were a real gap — a caller asking to cancel an
+  order already placed had nowhere to go, and the prompt now sends them to a person. One was a bad
+  test: the menu calls an item "Kerala Parotta (2 pcs)", so "two parotta" means pieces to a caller
+  and orders to the menu, and the case now says "two plates".

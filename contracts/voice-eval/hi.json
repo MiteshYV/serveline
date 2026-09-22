@@ -1,0 +1,267 @@
+{
+  "version": 1,
+  "language": "hi",
+  "cases": [
+    {
+      "id": "hi-order-one-dish",
+      "say": "haan bhaiya ek masala dosa bhej do",
+      "why": "the simplest order: one dish, one quantity",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Masala Dosa", "qty": 1 }] }
+    },
+    {
+      "id": "hi-order-two-dishes",
+      "say": "ek idli vada aur ek medu vada chahiye",
+      "why": "two dishes joined by aur, both vada-named, so neither swallows the other",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Idli Vada", "qty": 1 },
+          { "name": "Medu Vada", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-qty-words",
+      "say": "do plate set dosa dena bhaiya",
+      "why": "a quantity as a Hindi word with the classifier plate",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Set Dosa", "qty": 2 }] }
+    },
+    {
+      "id": "hi-order-qty-digits",
+      "say": "3 rava idli aur 2 masala chai bhej dena",
+      "why": "quantities as digits, which the recogniser returns as numerals",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Rava Idli", "qty": 3 },
+          { "name": "Masala Chai", "qty": 2 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-breads",
+      "say": "4 tandoori roti aur ek butter naan chahiye",
+      "why": "a bread count above one, where a dropped quantity is the usual failure",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Tandoori Roti", "qty": 4 },
+          { "name": "Butter Naan", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-veg-biryani",
+      "say": "ek veg biryani pack kar do, bas itna hi",
+      "why": "a closing phrase must not be read as another item",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Veg Biryani", "qty": 1 }] }
+    },
+    {
+      "id": "hi-order-mutton-biryani",
+      "say": "do mutton biryani chahiye tha bhaiya",
+      "why": "the past-tense politeness chahiye tha still means order it now",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Mutton Biryani", "qty": 2 }] }
+    },
+    {
+      "id": "hi-order-filler",
+      "say": "arre bhaiya wo, thoda ek khara bath dena",
+      "why": "filler words around the dish name",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Khara Bath", "qty": 1 }] }
+    },
+    {
+      "id": "hi-order-greeting-first",
+      "say": "hello bhaiya, ek bisi bele bath aur ek buttermilk dena",
+      "why": "a greeting before the order, and a drink the menu spells with its Kannada name",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Bisi Bele Bath", "qty": 1 },
+          { "name": "Buttermilk (Majjige)", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-curd-rice",
+      "say": "thoda curd rice bhej do, ek hi",
+      "why": "the quantity arrives after the dish, as an afterthought",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Curd Rice", "qty": 1 }] }
+    },
+    {
+      "id": "hi-order-parotta-kurma",
+      "say": "ek kerala parotta aur ek mixed veg kurma dena",
+      "why": "a dish whose menu name carries a piece count in brackets",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Kerala Parotta (2 pcs)", "qty": 1 },
+          { "name": "Mixed Veg Kurma", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-chow-chow",
+      "say": "ek chow chow bath aur ek badam milk dena",
+      "why": "a repeated-word dish name alongside a beverage",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Chow Chow Bath", "qty": 1 },
+          { "name": "Badam Milk", "qty": 1 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-slurred-name",
+      "say": "bhaiya do masala dose dena, jaldi",
+      "why": "the Bangalore plural dose for dosa, isolated on one line",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Masala Dosa", "qty": 2 }] }
+    },
+    {
+      "id": "hi-order-long",
+      "say": "bhaiya likh lo, do masala dosa, ek idli vada, 3 butter naan, ek chicken tikka masala aur do filter coffee bada",
+      "why": "a five-line order in one breath, with a size on the last line",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Masala Dosa", "qty": 2 },
+          { "name": "Idli Vada", "qty": 1 },
+          { "name": "Butter Naan", "qty": 3 },
+          { "name": "Chicken Tikka Masala", "qty": 1 },
+          { "name": "Filter Coffee", "qty": 2, "variant": "Large" }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-half-paneer",
+      "say": "aadha paneer butter masala aur do butter naan dena",
+      "why": "aadha must become the Half variant, not a half quantity",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Paneer Butter Masala", "qty": 1, "variant": "Half" },
+          { "name": "Butter Naan", "qty": 2 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-full-chicken-curry",
+      "say": "ek full chicken curry aur 2 kerala parotta",
+      "why": "the Full variant named in English, the way a caller says it",
+      "intent": "order",
+      "expect": {
+        "items": [
+          { "name": "Chicken Curry", "qty": 1, "variant": "Full" },
+          { "name": "Kerala Parotta (2 pcs)", "qty": 2 }
+        ]
+      }
+    },
+    {
+      "id": "hi-order-coffee-large",
+      "say": "ek filter coffee bada dena bhaiya",
+      "why": "bada must become the Large variant",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Filter Coffee", "qty": 1, "variant": "Large" }] }
+    },
+    {
+      "id": "hi-order-extra-ghee",
+      "say": "ek masala dosa, extra ghee daal ke",
+      "why": "an option from the Extras group, spelled as the menu spells it",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Masala Dosa", "qty": 1, "options": ["Extra ghee"] }] }
+    },
+    {
+      "id": "hi-order-biryani-raita",
+      "say": "ek chicken donne biryani raita ke saath",
+      "why": "the Served with group is a required choice, so the caller names it",
+      "intent": "order",
+      "expect": { "items": [{ "name": "Chicken Donne Biryani", "qty": 1, "options": ["Raita"] }] }
+    },
+    {
+      "id": "hi-offmenu-gobi-manchurian",
+      "say": "ek gobi manchurian milega kya",
+      "why": "a dish the menu does not have; nothing may reach the cart",
+      "intent": "other",
+      "expect": { "items": [] }
+    },
+    {
+      "id": "hi-offmenu-sweet",
+      "say": "kuch meetha hai kya, gulab jamun jaisa",
+      "why": "a category the menu does not carry; offering something is fine, adding it is not",
+      "intent": "other",
+      "expect": { "items": [] }
+    },
+    {
+      "id": "hi-offmenu-rumali-roti",
+      "say": "do rumali roti bhej do",
+      "why": "a near neighbour of Tandoori Roti; the nearest bread must not be substituted silently",
+      "intent": "other",
+      "expect": { "items": [] }
+    },
+    {
+      "id": "hi-enquiry-hours",
+      "say": "bhaiya aap kitne baje tak khule rehte ho",
+      "why": "an hours question answered from the outlet's settings, not from memory",
+      "intent": "enquiry",
+      "expect": { "items": [], "tool": "answer_enquiry" }
+    },
+    {
+      "id": "hi-enquiry-address",
+      "say": "aapki shop exactly kahan par hai",
+      "why": "an address question, answered in one turn",
+      "intent": "enquiry",
+      "expect": { "items": [], "tool": "answer_enquiry" }
+    },
+    {
+      "id": "hi-enquiry-delivery-area",
+      "say": "aap kaun kaun se area mein delivery karte ho",
+      "why": "the delivery area as a general question, not a serviceability check on one address",
+      "intent": "enquiry",
+      "expect": { "items": [], "tool": "answer_enquiry" }
+    },
+    {
+      "id": "hi-enquiry-menu",
+      "say": "poora menu kahan dekh sakta hoon bhaiya",
+      "why": "where to see the whole menu, rather than a search for one dish",
+      "intent": "enquiry",
+      "expect": { "items": [], "tool": "answer_enquiry" }
+    },
+    {
+      "id": "hi-code-apply",
+      "say": "mere paas ek card aaya tha, uspe code hai WELCOME10",
+      "why": "a discount code on its own, before anything is ordered",
+      "intent": "other",
+      "expect": { "items": [], "tool": "apply_code" }
+    },
+    {
+      "id": "hi-code-with-order",
+      "say": "do masala dosa dena aur mera code WELCOME10 bhi laga dena",
+      "why": "an order and a code in one utterance; both must land",
+      "intent": "order",
+      "expect": {
+        "items": [{ "name": "Masala Dosa", "qty": 2 }],
+        "tool": "apply_code"
+      }
+    },
+    {
+      "id": "hi-transfer-person",
+      "say": "bhaiya manager se baat karwa do zara",
+      "why": "a request for a person hands off rather than being talked around",
+      "intent": "other",
+      "expect": { "items": [], "tool": "transfer_to_human" }
+    },
+    {
+      "id": "hi-transfer-cancel",
+      "say": "mujhe apna order cancel karna hai",
+      "why": "there is no cancel tool, so the only correct move is a handoff",
+      "intent": "other",
+      "expect": { "items": [], "tool": "transfer_to_human" }
+    }
+  ]
+}

@@ -123,6 +123,7 @@ export function buildSystemPrompt(input: {
     '- Payment: place_order with payment_method upi_link sends the payment link by SMS itself; cod only when the card below says cash on delivery is on.',
     '- If place_order comes back with addressPending true, the SMS that went out is a link to confirm the delivery address, not a payment link. Say the order is in and a text has been sent to confirm the address, and that payment follows once they have. Do not promise a payment link.',
     '- Hours, address, delivery area or where to see the menu: answer_enquiry, in one turn. A second enquiry: offer the ordering page by SMS (send_sms page_link) and end the call.',
+    '- An order already placed is not yours to change: a caller who wants to cancel one, alter one, chase one or complain about one goes to transfer_to_human straight away. You have no tool for it and the counter does.',
     '- Hand off with transfer_to_human when the caller asks for a person, is upset, or you cannot resolve something in two attempts. When the order is placed or the caller is done, say goodbye and call end_call.',
     ...(anonymous
       ? ['- This call carries no phone number, so you cannot place an order. Take the caller through the menu if they want, then offer the ordering page by SMS is not possible either — say the restaurant will need to call them back, and hand off.']
@@ -191,7 +192,8 @@ export function buildSystemPrompt(input: {
   ].join('\n\n')
 }
 
-function hoursToday(outlet: PromptOutlet, now: Date): string {
+/** Exported for the eval harness, which refuses to score a call the outlet would decline. */
+export function hoursToday(outlet: PromptOutlet, now: Date): string {
   if (outlet.holidayDates.includes(istDate(now))) return 'closed today (holiday)'
   const parsed = hoursSchema.safeParse(outlet.hours)
   const today = parsed.success ? parsed.data[weekdayFmt.format(now).slice(0, 3).toLowerCase()] : undefined
