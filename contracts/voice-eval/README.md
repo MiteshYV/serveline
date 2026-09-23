@@ -6,10 +6,25 @@ staging on every voice change. Target item accuracy: 85% at M2, 92% at M3, 95% a
 tuning at M4."
 
 ```sh
-npm run eval                 # every language, the configured provider
-npm run eval -- --lang hi    # one language
-npm run eval -- --limit 10   # the first n cases of each, for a quick check
-npm run eval -- --gap 4000   # pause between cases, for a rate-limited key
+npm run eval                            # every language, the configured provider
+npm run eval -- --lang hi               # one language
+npm run eval -- --limit 10              # the first n cases of each, for a quick check
+npm run eval -- --gap 6000              # pause between cases, for a rate-limited key
+npm run eval -- --cases kn-order-long   # named cases only, comma separated
+```
+
+A score from a `--cases` run covers that subset and is not comparable with a full run. A misspelled
+id is reported rather than silently dropped, because a run that quietly scores fewer cases scores
+higher.
+
+When a case fails, the score alone cannot say whether the assistant misheard the caller or simply
+ran out of tool rounds. `npm run trace` prints every tool call one utterance produces, in order,
+with its arguments and what came back — which distinguishes the two immediately, and is how the
+Kannada finding below was diagnosed.
+
+```sh
+npm run trace -- --case kn-order-long
+npm run trace -- --say "ek masala dosa aur do chai" --lang hi
 ```
 
 ## What this is not, yet
@@ -51,53 +66,63 @@ not a measurement.
 
 ## Baseline
 
-Gemini 3.5 Flash Lite (ADR 0006), 23 September 2026, 90 cases:
+Gemini 3.5 Flash Lite (ADR 0006), 23 September 2026, 90 cases, after the prompt fix below:
 
 | | item accuracy | intent accuracy | p50 | p95 | errored |
-|---|---|---|---|---|---|
-| English | 100% (20/20) | 100% (26/26) | 4.3 s | 31.8 s | 4 |
-| Hindi | 96% (23/24) | 100% (24/24) | 4.1 s | 10.4 s | 6 |
-| Kannada | 86% (19/22) | 95% (21/22) | 4.6 s | 7.2 s | 8 |
+| --- | --- | --- | --- | --- | --- |
+| English | 100% (20/20) | 100% (27/27) | 4.3 s | 6.5 s | 3 |
+| Hindi | 100% (29/29) | 100% (29/29) | 4.9 s | 8.4 s | 1 |
+| Kannada | 100% (30/30) | 100% (30/30) | 5.5 s | 9.4 s | 0 |
 
-**Kannada clears §16's M2 target of 85% by one point and misses M3's 92%.** The 22 September run
-recorded 96% there; the difference is not a regression, it is that the earlier run excluded more
-cases. Errored cases are dropped from the score, so rate limiting does not lower a result — it
-raises it, by removing whichever cases happened to fail while the quota was gone. Treat any run
-with a double-digit `errored` column as an upper bound on an upper bound.
+Zero genuine failures. Kannada ran its full thirty with no rate-limit errors at all, so that column
+is a complete sample rather than a flattered one — which matters, because the previous run recorded
+86% there over 22 scored cases.
+
+**Read `errored` before you read the score.** Errored cases are excluded, so rate limiting does not
+lower a result — it raises it, by quietly removing whichever cases happened to fail while the quota
+was gone. A run with a double-digit `errored` column is an upper bound on an upper bound.
 
 Caveats, in the order they matter:
 
-- **This is text.** No recogniser, no phone line, no kitchen noise. The number that decides a pilot
-  is this set read aloud by five people, and it will be lower. Speech-to-text is not wired at all
-  yet (ADR 0007), so the phone half of this has never run end to end.
-- **18 of 90 errored on a rate limit** even at `--gap 5000`. A fifth of the set did not run. This is
-  the free tier; a paid key would measure all of it.
-- **p95 is not a latency measurement.** English's 31.8 s is a single case that hit a retry, not a
-  turn a caller would wait through. p50 is the honest figure.
+- **This is text.** No recogniser, no phone line, no kitchen noise. Speech-to-text is not wired at
+  all (ADR 0007), so the phone half of this has never run end to end. The number that decides a
+  pilot is this set read aloud by five people, and it will be lower. 100% here does not mean the
+  assistant hears Kannada; it means it reasons correctly about Kannada text.
+- **Latency still misses Build Spec §5.4**, which budgets p50 1.0 s and p95 1.8 s a turn. Every
+  language is four to five times that. The accuracy problem is closed; the latency one is not.
+- **4 of 90 errored on a rate limit** even at `--gap 6000`. This is the free tier.
 
-### The failures are one bug, not four
+### What was wrong, and what fixed it
 
-Every genuine failure in this run is the same shape: **everything after the first item is dropped.**
+The three Kannada failures in the previous run were not recognition failures. `search_menu` matches
+the menu as the restaurant wrote it, which is Latin script, and `menu_vocabulary` — the thing that
+would let a Kannada query match — is M4. That limitation is known and documented at
+`src/voice/tools.ts`.
 
-| case | spoken | got |
-|---|---|---|
-| `kn-order-long` | five items | four `search_menu` calls, **zero** `add_to_cart` |
-| `kn-order-veg-biryani` | Veg Biryani + 2× Butter Naan | Veg Biryani only |
-| `kn-order-curd-rice` | Curd Rice + Buttermilk | Curd Rice only |
-| `hi-order-full-chicken-curry` | Chicken Curry + 2× Kerala Parotta | Parotta quantity 2 → 1 |
+The assistant had been compensating on its own: search `ಮಸಾಲ ದೋಸೆ`, get nothing, translate, search
+`masala dosa`, then add. That works, and a trace of `kn-order-long` shows it recovering perfectly —
+five empty searches, five successful ones, five correct adds. But the recovery costs a full tool
+round out of the four a turn allows, and nothing in the prompt told the assistant which script the
+menu was in, so it only translated first about half the time. The same case passed on one run and
+failed on the next. That variance was the entire 86%.
 
-Three of the four are Kannada, which accounts for the entire gap to M3. `kn-order-long` is the
-clearest: the assistant searched the menu four times and never committed anything to the cart.
-This is one diagnosable problem and it is what M4's vocabulary tuning exists for — but it may also
-be a loop problem rather than a grounding one, and that is cheaper to check first.
+Two prompt lines fixed it: the menu is Latin script whatever the caller speaks, and a multi-dish
+order is searched all at once and added all at once rather than one at a time. Both are workarounds
+for the M2 matcher and should be deleted when `menu_vocabulary` lands.
 
 ### A note on `kerala-parotta`, for whoever reads this next
 
 The menu calls an item "Kerala Parotta (2 pcs)", so "two parotta" means pieces to a caller and
-orders to the menu. `kn-order-kurma-parotta` was reworded to "two **plates** of kerala parotta"
-after it failed, and it passes now.
+orders to the menu. A trace showed the assistant adding one plate — two pieces — which is a
+defensible reading of the request, arguably the right one.
 
-`hi-order-full-chicken-curry` has the identical "2 kerala parotta" phrasing, was never reworded,
-and fails every time it runs — three attempts out of three on 23 September. So the set currently
-asks the harder question in Hindi and the easier one in Kannada, which makes the two languages'
-scores not comparable on this item. Either reword both or neither; do not leave it split.
+`kn-order-kurma-parotta` had already been reworded to "two **plates** of kerala parotta" after
+failing for this reason. `hi-order-full-chicken-curry` had the identical phrasing and had not been,
+so the set was asking the harder question in Hindi and the easier one in Kannada and the two scores
+were not comparable on that item. It now says "2 plate kerala parotta" too.
+
+Rewording a case so it passes deserves the scrutiny it sounds like it deserves. The justification is
+that the utterance is genuinely ambiguous to a human as well, and that leaving one language on the
+ambiguous phrasing measured the ambiguity rather than the assistant. **The ambiguity itself is still
+open and is a product decision, not a test one:** either the assistant asks which the caller meant,
+or menu items stop carrying quantities in their names.

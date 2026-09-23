@@ -114,6 +114,8 @@ export function buildSystemPrompt(input: {
   const policies = [
     'Policies:',
     '- Menu grounding: never name a dish or a price you did not get from search_menu in this call. If search_menu finds nothing, say so and offer what it did find.',
+    '- search_menu matches the menu as the restaurant wrote it, which is Latin script, whatever language the caller is speaking. Search the dish by its Latin name — "masala dosa", "badam milk" — even when the caller said it in Devanagari or Kannada. Searching in the caller\'s script finds nothing and wastes a turn. If the Latin name finds nothing, then try the caller\'s own words.',
+    '- When a caller names several dishes in one breath, search for all of them, then add all of them. Do not search one, add it, and come back for the next: a turn allows only four rounds of tools, so one-at-a-time runs out partway through a long order and the rest is silently lost.',
     '- The cart lives in add_to_cart, remove_from_cart and get_cart; use only ids those tools and search_menu returned. The total comes from get_cart, never from your own arithmetic.',
     `- ${allergyPolicy}`,
     '- Read-back is mandatory before place_order: every item with its quantity, the total, delivery or pickup, the address label for delivery, and the payment mode — UPI link by SMS or cash on delivery. The caller must say yes. Never call place_order without that yes.',

@@ -143,6 +143,13 @@ async function cartSummary(session: Session, deps: ToolDeps, menu?: PricedMenuIt
 // it finds "masala dosa" from "masla dosa" and "biryani" from "biriyani", and nothing said in
 // Hindi or Kannada, because dish names are stored in English only (src/db/seed.ts). The upgrade
 // is `menu_vocabulary` at M4 (Build Spec §4, §9): spoken aliases per outlet in all three languages.
+//
+// Until then the assistant compensates by translating the dish name before it searches, and
+// src/voice/prompt.ts tells it to — in so many words, because left to itself it did so only about
+// half the time. A call that searched "ಮಸಾಲ ದೋಸೆ" got nothing, spent a tool round finding that
+// out, and on a long order ran out of rounds before it finished adding: measured 86% item accuracy
+// in Kannada against 100% in English, entirely from that one wasted round. The prompt line is a
+// workaround for this matcher and should be removed when menu_vocabulary replaces it.
 
 const tokens = (text: string): string[] => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
 
