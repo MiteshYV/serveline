@@ -1,0 +1,108 @@
+/* ==========================================================================
+   ShadCN → Steel & Enamel bridge
+   Source of truth stays docs/design/steel-and-enamel.md and tokens.css. See ADR 0008.
+
+   ShadCN components are written against Tailwind's semantic colour utilities —
+   `bg-background`, `text-muted-foreground`, `border-input`, `ring-ring`. This file is the
+   only place those names are given meaning, and every one of them resolves to a token
+   from tokens.css.
+
+   Two consequences, both deliberate:
+
+   1. A ShadCN primitive inherits dark mode for free. tokens.css already re-points every
+      role under `[data-theme="dark"]` and under the OS media query, so a primitive that
+      reads `--color-background` follows the theme without a single `dark:` utility.
+
+   2. A ShadCN primitive cannot introduce a colour. There is no raw value below — only
+      `var(--token)`. A utility that does not resolve to a token is a bug, not a shortcut.
+
+   `inline` matters: it makes Tailwind emit `var(--bg-app)` at the use site rather than
+   copying today's computed value into its own variable. Without it the bridge would
+   snapshot the light palette and dark mode would stop working.
+   ========================================================================== */
+
+@theme inline {
+  /* ---- Surfaces ------------------------------------------------------- */
+  --color-background: var(--bg-app);
+  --color-foreground: var(--text-primary);
+
+  --color-card: var(--bg-card);
+  --color-card-foreground: var(--text-primary);
+
+  /* Popovers, dropdowns and dialogs sit above the card, so they take the raised role. */
+  --color-popover: var(--bg-raised);
+  --color-popover-foreground: var(--text-primary);
+
+  /* ---- Action: colour is never a button ------------------------------- */
+  /* --action-fill is steel-900 in light and steel-025 in dark. A ShadCN "primary"
+     button is therefore a steel plate in both themes, never an enamel one. */
+  --color-primary: var(--action-fill);
+  --color-primary-foreground: var(--action-on);
+
+  --color-secondary: var(--bg-sunken);
+  --color-secondary-foreground: var(--text-primary);
+
+  /* Menu and list hover. Steel, so hovering never reads as a state change. */
+  --color-accent: var(--bg-sunken);
+  --color-accent-foreground: var(--text-primary);
+
+  --color-muted: var(--bg-sunken);
+  --color-muted-foreground: var(--text-secondary);
+
+  /* ---- Destructive ----------------------------------------------------- */
+  /* Attention enamel — oxblood, not Zomato red. Isolated destruction: this is for the
+     confirm control inside a destructive flow, never for a row's ordinary delete link. */
+  --color-destructive: var(--state-attention-plate);
+  --color-destructive-foreground: var(--state-attention-on);
+
+  /* ---- Lines and focus -------------------------------------------------- */
+  --color-border: var(--border-separator);
+  --color-input: var(--border-control);
+  --color-ring: var(--focus-outer);
+
+  /* ---- Radius: plates, not pills ---------------------------------------- */
+  /* Tailwind's own radius scale, re-pointed. --radius-full stays Tailwind's, and is
+     reserved by the design language for avatars and count badges only. */
+  --radius-sm: var(--radius-2);
+  --radius-md: var(--radius-3);
+  --radius-lg: var(--radius-4);
+  --radius-xl: var(--radius-5);
+
+  /* ---- Type ------------------------------------------------------------- */
+  --font-sans: var(--font-ui);
+
+  /* ---- Motion ----------------------------------------------------------- */
+  --ease-in-out: var(--ease-inout);
+}
+
+/* `--font-mono`, `--ease-out` and `--ease-in` are deliberately absent above: tokens.css
+   already defines those exact names at `:root`, and it is imported unlayered, so it beats
+   Tailwind's `@layer theme` defaults. `font-mono` and `ease-out` therefore already resolve
+   to the Steel & Enamel values. Restating them here would be `--ease-out: var(--ease-out)`,
+   which is circular and silently drops the declaration. Only `--ease-inout` needs a line,
+   because Tailwind spells the same curve `--ease-in-out`. */
+
+/* ==========================================================================
+   The dark variant
+
+   ShadCN ships components carrying the occasional `dark:` utility. Stock ShadCN keys
+   that on a `.dark` class; ADR 0002 §3 keys this product on `[data-theme]` plus the OS
+   setting, with an explicit light choice winning over a dark OS. This teaches Tailwind
+   the same rule, so a `dark:` utility that does survive into a primitive agrees with the
+   tokens around it instead of contradicting them.
+
+   Prefer not to need it. A primitive that reads the bridge above is already correct in
+   both themes; a `dark:` utility is a second source of truth and should be deleted
+   rather than fixed.
+   ========================================================================== */
+
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+}

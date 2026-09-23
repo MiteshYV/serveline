@@ -1,8 +1,8 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import styles from './Button.module.css'
 
-type Variant = 'primary' | 'ghost' | 'brand' | 'danger'
-type Size = 'customer' | 'counter' | 'dense'
+export type Variant = 'primary' | 'ghost' | 'brand' | 'danger'
+export type Size = 'customer' | 'counter' | 'dense'
 
 type Base = {
   /**

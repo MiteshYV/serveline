@@ -1,8 +1,16 @@
 /* Tailwind is layered (@layer base/components/utilities); tokens.css is not, so the design system
    always wins over preflight. Tailwind is for page layout in app/ only — components under src/ui
-   read tokens through their own CSS modules and never use a utility class. */
+   read tokens through their own CSS modules and never use a utility class.
+
+   One carve-out, added with ShadCN (ADR 0008): `src/ui/primitives/*` are ShadCN components and do
+   use utility classes. They are allowed to because shadcn-bridge.css gives every semantic utility
+   they touch — bg-background, text-muted-foreground, border-input, ring-ring — a Steel & Enamel
+   token as its value. The rule the original line was protecting still holds: a primitive cannot
+   introduce a colour, a radius or a font the design system has not already decided. A utility that
+   does not resolve to a token is a bug. */
 @import "tailwindcss";
 @import "../src/ui/tokens.css";
+@import "../src/ui/shadcn-bridge.css";
 
 /* Preflight fades placeholders to 50% currentColor, which fails contrast. Design §3.1: steel-500. */
 ::placeholder {

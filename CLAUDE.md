@@ -50,6 +50,13 @@ M1 is complete and browser-verified. See Build Spec §14 and docs/superpowers/sp
   signed challenge, not a table, because Build Spec §10 gives it a ten-minute life and nothing else.
 - `src/ui/` — design tokens and shared components. Tokens are CSS custom properties; do not
   hard-code a colour or a spacing value in a component.
+- `src/ui/primitives/` — ShadCN components (Select, Dialog, Tabs, Popover, Tooltip, DropdownMenu,
+  Switch, Label, Sonner). These are the one place utility classes are allowed, because
+  `shadcn-bridge.css` gives every utility they use a Steel & Enamel token as its value (ADR 0008).
+  A utility that does not resolve to a token is a bug. There is one Button in this codebase and it
+  is `src/ui/Button.tsx`; do not add a second. Do not add a `dark:` utility — tokens.css already
+  flips. Anything added here that renders on the customer ordering page must be measured against
+  ADR 0003's Lighthouse budget before it ships.
 - `app/` — routes only. Thin. Business rules belong in `src/core/`.
 - `contracts/` — plain JSON and Markdown that the Python voice service will also read at M2.
   Language-neutral by design. No TypeScript in here.
