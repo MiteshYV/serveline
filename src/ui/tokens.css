@@ -396,6 +396,24 @@ body {
   font-feature-settings: "tnum" 1;
 }
 
+/* Available to a screen reader, not to the eye. Defined here, once, for the same reason `.num`
+   is: it belongs to the design system rather than to any one surface. There were three of these
+   before — a local `.srOnly` in Board.module.css and Tailwind's `sr-only` used in two places —
+   which is how a fourth gets written.
+   Not `display: none` and not `visibility: hidden`: both remove it from the accessibility tree,
+   which is the opposite of the point. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 :focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-inner), 0 0 0 4px var(--focus-outer);

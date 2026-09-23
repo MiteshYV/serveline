@@ -1,10 +1,13 @@
+import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 import { vendorMode } from '@/adapters/mode.ts'
 import { requirePlatform } from '@/auth/session.ts'
 import { Button } from '@/ui/Button.tsx'
+import { ThemeToggle } from '@/ui/ThemeToggle.tsx'
+import { AGENT_THEME_COOKIE, isTheme } from '@/ui/theme.ts'
 import c from '../console.module.css'
 import { NavLink } from './NavLink.tsx'
-import { signOut } from './actions.ts'
+import { setPlatformTheme, signOut } from './actions.ts'
 
 /**
  * Every console page sits behind `requirePlatform()` (Build Spec §8). Pages call it again for the
@@ -13,6 +16,8 @@ import { signOut } from './actions.ts'
  */
 export default async function ConsoleLayout({ children }: { children: ReactNode }) {
   const session = await requirePlatform()
+  const chosen = (await cookies()).get(AGENT_THEME_COOKIE)?.value
+  const theme = isTheme(chosen) ? chosen : 'os'
   return (
     <div className={c.shell}>
       <header className={c.nav}>
@@ -29,6 +34,13 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
         </nav>
         <div className={c.navMeta}>
           <span>{session.role}</span>
+          <ThemeToggle
+            action={setPlatformTheme}
+            current={theme}
+            size="dense"
+            legend="Theme"
+            labels={{ os: 'OS', light: 'Light', dark: 'Dark' }}
+          />
           <form action={signOut}>
             <Button type="submit" size="dense" variant="ghost">Sign out</Button>
           </form>

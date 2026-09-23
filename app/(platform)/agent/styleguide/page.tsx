@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 import { ORDER_TRANSITIONS, type Fulfilment, type OrderStatus } from '@/core/orders.ts'
 import { Band } from '@/ui/Band.tsx'
@@ -14,7 +15,10 @@ import { OtpInput } from '@/ui/OtpInput.tsx'
 import { PhoneInput } from '@/ui/PhoneInput.tsx'
 import { StateGlyph } from '@/ui/StateGlyph.tsx'
 import { StatusChip } from '@/ui/StatusChip.tsx'
-import { LiveOrderCard, MenuDemo, ResendDemo, StepperDemo, ThemeToggle } from './demos.tsx'
+import { ThemeToggle } from '@/ui/ThemeToggle.tsx'
+import { AGENT_THEME_COOKIE, isTheme } from '@/ui/theme.ts'
+import { setPlatformTheme } from '../(console)/actions.ts'
+import { LiveOrderCard, MenuDemo, ResendDemo, StepperDemo } from './demos.tsx'
 
 export const metadata = { title: 'ServeLine styleguide' }
 
@@ -84,7 +88,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Every component in every state, on one screen. This page is the UI layer's test. */
-export default function StyleguidePage() {
+export default async function StyleguidePage() {
+  // The styleguide shows the control that ships, not a lookalike: a page documenting the
+  // design system should not be the one place in the product where a component behaves
+  // differently. The previous demo mutated document.documentElement and persisted nothing.
+  const chosenTheme = (await cookies()).get(AGENT_THEME_COOKIE)?.value
+  const theme = isTheme(chosenTheme) ? chosenTheme : 'os'
   return (
     <main className="mx-auto max-w-[960px] grid gap-[var(--space-48)] px-[var(--space-20)] py-[var(--space-32)]">
       <header className="flex flex-wrap items-center justify-between gap-[var(--space-16)]">
@@ -94,7 +103,13 @@ export default function StyleguidePage() {
             Every component, every state. Sections are wrapped in their native density.
           </p>
         </div>
-        <ThemeToggle />
+        <ThemeToggle
+          action={setPlatformTheme}
+          current={theme}
+          size="dense"
+          legend="Theme"
+          labels={{ os: 'OS', light: 'Light', dark: 'Dark' }}
+        />
       </header>
 
       <Section title="StateGlyph" note="§3.3 — six inline SVGs, each with a <title>. Shape, not colour alone.">

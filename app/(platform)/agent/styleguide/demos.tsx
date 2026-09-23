@@ -11,22 +11,6 @@ import { Button } from '@/ui/Button.tsx'
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-/** The light/dark toggle the dashboard will also ship (ADR 0002 §3): `data-theme` on <html>. */
-export function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark' | ''>('')
-  function apply(next: 'light' | 'dark' | '') {
-    setTheme(next)
-    if (next) document.documentElement.dataset.theme = next
-    else delete document.documentElement.dataset.theme
-  }
-  return (
-    <div className="flex gap-[var(--space-8)]">
-      <Button size="dense" variant={theme === '' ? 'primary' : 'ghost'} onClick={() => apply('')}>OS</Button>
-      <Button size="dense" variant={theme === 'light' ? 'primary' : 'ghost'} onClick={() => apply('light')}>Light</Button>
-      <Button size="dense" variant={theme === 'dark' ? 'primary' : 'ghost'} onClick={() => apply('dark')}>Dark</Button>
-    </div>
-  )
-}
 
 /**
  * An order card with a fake server behind it. `mode` decides what onAction does:

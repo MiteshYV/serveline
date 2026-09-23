@@ -5,6 +5,8 @@ import fieldStyles from '@/ui/Field.module.css'
 import { td } from '@/ui/i18n-dashboard.ts'
 import { t } from '@/ui/i18n.ts'
 import { LANGS, LANG_NAMES } from '@/ui/lang.ts'
+import { ThemeToggle } from '@/ui/ThemeToggle.tsx'
+import { isTheme } from '@/ui/theme.ts'
 import { THEME_COOKIE, readLang } from '../../_lib/prefs.ts'
 import { currentOutlet } from '../../_lib/session.ts'
 import { setLang, setTheme } from './actions.ts'
@@ -23,7 +25,8 @@ type Hours = Record<string, [string, string][]>
 export default async function SettingsPage() {
   const { outlet, session } = await currentOutlet()
   const lang = await readLang()
-  const theme = (await cookies()).get(THEME_COOKIE)?.value ?? 'os'
+  const chosenTheme = (await cookies()).get(THEME_COOKIE)?.value
+  const theme = isTheme(chosenTheme) ? chosenTheme : 'os'
 
   const hours = (outlet.hours ?? {}) as Hours
   const values: SettingsValues = {
@@ -43,13 +46,13 @@ export default async function SettingsPage() {
 
       <section className={styles.fieldset}>
         <h2 className={styles.legend} style={{ margin: 0 }}>Display</h2>
-        <form action={setTheme} className={styles.segmented} aria-label="Theme">
-          {(['os', 'light', 'dark'] as const).map((v) => (
-            <Button key={v} size="counter" variant={theme === v ? 'primary' : 'ghost'} type="submit" name="theme" value={v} aria-pressed={theme === v}>
-              {v === 'os' ? 'Follow phone' : v === 'light' ? 'Light' : 'Dark'}
-            </Button>
-          ))}
-        </form>
+        <ThemeToggle
+          action={setTheme}
+          current={theme}
+          size="counter"
+          legend="Theme"
+          labels={{ os: 'Follow phone', light: 'Light', dark: 'Dark' }}
+        />
         <form action={setLang} className="flex items-end gap-[var(--space-12)]">
           <Field id="lang" label={t('common.language', lang)}>
             {(p) => (

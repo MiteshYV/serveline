@@ -9,7 +9,8 @@ import { LANG_COOKIE, isLang } from '@/ui/lang.ts'
  * (`@/ui/lang.ts`, path /) — one device, one language, and the root layout reads it for
  * `<html lang>`. None is secret and none is customer data, so no table and no audit row.
  */
-export const THEME_COOKIE = 'sl_theme'
+/** Re-exported from `@/ui/theme.ts`, which the root layout also reads. One name, one place. */
+export { THEME_COOKIE } from '@/ui/theme.ts'
 export const NAG_COOKIE = 'sl_nag'
 export { LANG_COOKIE }
 

@@ -11,21 +11,29 @@ import { currentOutlet } from '../../_lib/session.ts'
 
 // ---- display preferences: every role, per device ------------------------------------------
 
-/** ADR 0002 §3: the dashboard's manual light/dark toggle. "os" clears it. */
+/**
+ * ADR 0002 §3: the dashboard's manual light/dark toggle. "os" clears the cookie, which is what
+ * makes `:root:not([data-theme="light"])` apply again.
+ *
+ * Both of these revalidate `/` rather than `/app`. The attribute each one changes —
+ * `<html data-theme>` and `<html lang>` — is written by the root layout, which lives at `/`, not
+ * under `/app`. Naming `/app` invalidated everything except the segment that had to re-render, so
+ * the cookie was set correctly and the page kept its old theme until a hard reload.
+ */
 export async function setTheme(form: FormData): Promise<void> {
   await currentOutlet()
   const v = form.get('theme')
   const jar = await cookies()
   if (v === 'light' || v === 'dark') jar.set(THEME_COOKIE, v, APP_COOKIE)
   else jar.delete({ name: THEME_COOKIE, path: APP_COOKIE.path })
-  revalidatePath('/app', 'layout')
+  revalidatePath('/', 'layout')
 }
 
 export async function setLang(form: FormData): Promise<void> {
   await currentOutlet()
   const v = form.get('lang')
   if (isLang(v)) (await cookies()).set(LANG_COOKIE, v, SITE_COOKIE)
-  revalidatePath('/app', 'layout')
+  revalidatePath('/', 'layout')
 }
 
 // ---- outlet settings: owner only (Build Spec §10) -------------------------------------------
