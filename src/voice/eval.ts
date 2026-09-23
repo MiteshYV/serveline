@@ -165,6 +165,20 @@ const dir = flag('dir') ?? join(process.cwd(), 'contracts', 'voice-eval')
 const only = flag('lang')
 const limit = Number(flag('limit') ?? Infinity)
 const gap = Number(flag('gap') ?? 0)
+
+/**
+ * `--cases a,b,c` runs only those case ids.
+ *
+ * A rate-limited run reports its blocked cases as `!` and excludes them from the score, so the
+ * headline number is computed over whatever survived. Re-running the whole suite to recover a
+ * handful of them costs the quota that caused the problem. This re-runs just those.
+ *
+ * A score from a `--cases` run is a score for that subset and is not comparable with a full run.
+ */
+const pick = flag('cases')?.split(',').map((s) => s.trim()).filter(Boolean)
+const chosen = pick && pick.length > 0 ? new Set(pick) : null
+/** Ids actually found in a suite, so a misspelled one is reported rather than silently dropped. */
+const seen = new Set<string>()
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const files = readdirSync(dir).filter((f) => f.endsWith('.json') && (!only || f === `${only}.json`))
@@ -178,9 +192,11 @@ const summary: string[] = []
 
 for (const file of files.sort()) {
   const suite = Suite.parse(JSON.parse(readFileSync(join(dir, file), 'utf8')))
-  const cases = suite.cases.slice(0, limit)
+  const cases = (chosen ? suite.cases.filter((c) => chosen.has(c.id)) : suite.cases).slice(0, limit)
+  if (cases.length === 0) continue
+  for (const c of cases) seen.add(c.id)
   const results: Outcome[] = []
-  console.log(`## ${suite.language} — ${cases.length} cases`)
+  console.log(`## ${suite.language} — ${cases.length} cases${chosen ? ' (subset)' : ''}`)
   for (const c of cases) {
     if (gap) await sleep(gap)
     const r = await runCase(outlet.id, phoneHash, suite.language, 'http://localhost:3000', c, () => failovers)
@@ -202,6 +218,12 @@ for (const file of files.sort()) {
     + (results.length - scored.length > 0 ? `   ${results.length - scored.length} errored` : ''),
   )
   console.log()
+}
+
+const missing = chosen ? [...chosen].filter((id) => !seen.has(id)) : []
+if (missing.length > 0) {
+  console.log(`! no case with this id: ${missing.join(', ')}`)
+  console.log('  They were not run and are not in the figures below. Check the spelling.\n')
 }
 
 console.log('=== summary ===')

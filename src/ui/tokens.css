@@ -31,8 +31,13 @@
   --bg-inverse:    var(--steel-900);
 
   --text-primary:   var(--steel-900);   /* 16.16:1 on card */
-  --text-secondary: var(--steel-600);   /*  6.70:1 */
-  --text-tertiary:  var(--steel-500);   /*  4.69:1 */
+  --text-secondary: var(--steel-600);   /*  6.70:1 card · 5.90 app · 5.37 sunken — safe anywhere */
+  /* CARD ONLY. 4.69:1 on --bg-card, but 4.13:1 on --bg-app and 3.76:1 on --bg-sunken, both under
+     the 4.5 floor. This is a property of the role, not a bug to fix: the only step in the steel
+     ramp that clears every ground is steel-600, which is --text-secondary. There is no room
+     between "readable anywhere" and "too light". On any ground but the card, use
+     --text-secondary. Enforced by tokens.test.ts. */
+  --text-tertiary:  var(--steel-500);
   --text-inverse:   var(--steel-000);
   --text-disabled:  var(--steel-400);   /* SC 1.4.3 exempts disabled */
 
@@ -88,7 +93,11 @@
   --brand-on:   var(--steel-000);
   --brand-ink:  var(--steel-800);
   --brand-wash: var(--steel-050);
-  --brand-edge: var(--brand-ink);
+  /* --brand-edge was here. It read `var(--brand-ink)`, which resolves against :root and is then
+     inherited as an already-resolved string, so a restaurant's [data-brand] block (brand.ts) could
+     never change it — it was frozen at the steel fallback in both themes. Nothing consumed it.
+     Removed rather than repaired: a token that cannot carry the value its name promises is a trap
+     for whoever reaches for it next. Use --brand-ink directly. */
 
   /* ---- Focus: brand-independent dual-tone ---------------------------- */
   --focus-inner: #FFFFFF;
@@ -199,29 +208,41 @@
   --action-fill-hover: var(--steel-100);
   --action-ghost-ink:  var(--steel-200);
 
+  /* Plates carry two ratios, and until now only one of them was measured. `on`-against-plate is
+     SC 1.4.3 (4.5:1, the word you read). Plate-against-card is SC 1.4.11 (3:1, seeing the chip is
+     a chip at all). The light plates cleared both by accident; the dark ones cleared only the
+     first — received sat at 2.03:1 on --bg-card, preparing at 1.64:1 — so a filled chip that
+     reads as bold enamel in light read as a barely-there tint in dark.
+     The four loud plates below are lifted into the window where both hold: plate L in
+     [0.1449, 0.1833], i.e. >= 3:1 on --bg-card #192227 while white still clears 4.5:1 on top.
+     Delivered and cancelled are deliberately left quiet — "delivered returns to steel" is a law,
+     and their word carries 9.57:1 and 10.35:1, which is what identifies them.
+     NOTE: --bg-raised #28333A is not satisfiable — it needs plate L >= 0.1937 while white caps it
+     at 0.1833, and the windows do not overlap. A filled chip cannot pass on a raised ground in
+     dark at any colour. Use `outline` there; `filled` is counter-dashboard-only by design §7.2. */
   --state-received-ink:    #6FB8F5;  /* 7.58 card / 8.50 app / 6.06 raised */
-  --state-received-plate:  #12557F;
-  --state-received-on:     #FFFFFF;  /* 7.98 */
+  --state-received-plate:  #2079B4;  /* 3.43 on card */
+  --state-received-on:     #FFFFFF;  /* 4.71 */
   --state-received-wash:   #10273A;
 
   --state-preparing-ink:   #E8B857;  /* 8.79 / 9.86 / 7.03 */
-  --state-preparing-plate: #5E3C07;
-  --state-preparing-on:    #FFFFFF;  /* 9.88 */
+  --state-preparing-plate: #9A6A0F;  /* 3.42 on card */
+  --state-preparing-on:    #FFFFFF;  /* 4.73 */
   --state-preparing-wash:  #2E2109;
 
   --state-ready-ink:       #4FC894;  /* 7.71 / 8.65 / 6.17 */
-  --state-ready-plate:     #0C5738;
-  --state-ready-on:        #FFFFFF;  /* 8.62 */
+  --state-ready-plate:     #148457;  /* 3.44 on card */
+  --state-ready-on:        #FFFFFF;  /* 4.70 */
   --state-ready-wash:      #0D2E22;
 
   --state-delivered-ink:   #AAB8C0;  /* 7.95 / 8.91 / 6.36 */
-  --state-delivered-plate: #3A474F;
+  --state-delivered-plate: #3A474F;  /* quiet by law; the word carries it */
   --state-delivered-on:    #FFFFFF;  /* 9.57 */
   --state-delivered-wash:  #1C262C;
 
   --state-attention-ink:   #FF9FB0;  /* 8.34 / 9.35 / 6.67 */
-  --state-attention-plate: #8E0F2B;
-  --state-attention-on:    #FFFFFF;  /* 9.32 */
+  --state-attention-plate: #C92B57;  /* 3.05 on card */
+  --state-attention-on:    #FFFFFF;  /* 5.29 */
   --state-attention-wash:  #33101C;
 
   --state-cancelled-ink:   #99A4AD;  /* 6.36 / 7.14 / 5.09 */
@@ -247,6 +268,21 @@
   --bevel:  none;
 }
 
+/* ==========================================================================
+   NATIVE WIDGETS
+
+   `color-scheme` is what the UA draws select popups, scrollbars, checkboxes, date pickers and
+   form controls from. Declared once on :root as `light dark` it means "page supports both, you
+   choose" — so the native layer follows the OS while the palette follows [data-theme]. A cook who
+   sets the counter tablet to Light under a dark OS got light panels with dark dropdowns.
+
+   These two rules make the native layer follow the same choice. :root keeps `light dark` so that
+   with no manual choice — the customer ordering page, always — the OS still decides.
+   ========================================================================== */
+
+:root[data-theme="dark"]  { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg-app:    var(--steel-950);
@@ -271,16 +307,18 @@
     --action-fill-hover: var(--steel-100);
     --action-ghost-ink:  var(--steel-200);
 
+    /* Kept byte-for-byte in step with the [data-theme="dark"] block above; src/ui/tokens.test.ts
+       fails if the two ever drift. See that block for why these four plates are where they are. */
     --state-received-ink:    #6FB8F5;
-    --state-received-plate:  #12557F;
+    --state-received-plate:  #2079B4;
     --state-received-on:     #FFFFFF;
     --state-received-wash:   #10273A;
     --state-preparing-ink:   #E8B857;
-    --state-preparing-plate: #5E3C07;
+    --state-preparing-plate: #9A6A0F;
     --state-preparing-on:    #FFFFFF;
     --state-preparing-wash:  #2E2109;
     --state-ready-ink:       #4FC894;
-    --state-ready-plate:     #0C5738;
+    --state-ready-plate:     #148457;
     --state-ready-on:        #FFFFFF;
     --state-ready-wash:      #0D2E22;
     --state-delivered-ink:   #AAB8C0;
@@ -288,7 +326,7 @@
     --state-delivered-on:    #FFFFFF;
     --state-delivered-wash:  #1C262C;
     --state-attention-ink:   #FF9FB0;
-    --state-attention-plate: #8E0F2B;
+    --state-attention-plate: #C92B57;
     --state-attention-on:    #FFFFFF;
     --state-attention-wash:  #33101C;
     --state-cancelled-ink:   #99A4AD;
@@ -369,11 +407,43 @@ body {
   :root[data-theme="dark"] { --border-control: var(--steel-400); --border-separator: var(--steel-500); }
 }
 
+/* The block above has an arm for light and an arm for *manually chosen* dark, and for a while
+   that was all it had — which meant it did nothing at all for anyone on OS dark, the majority
+   case. The palette there is applied by `:root:not([data-theme="light"])` at specificity (0,2,0);
+   the plain `:root` arm above is (0,1,0), so the palette won and the borders never stepped.
+   This arm matches that specificity and comes later in the file, so it wins. Design §9. */
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --border-control: var(--steel-400);
+    --border-separator: var(--steel-500);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Design §8 prints the blanket rule above and then says, in the next line: "Then restore intent
+   selectively: opacity-only cross-fades at <= 100ms are permitted, transforms are not."
+   The restore was never written, so "reduce motion" meant *no* motion — including the new-order
+   band, whose three-cycle alert collapsed to a single 0.01ms cycle (Band.module.css says so in a
+   comment). Reduced motion means vestibular safety, not the removal of feedback.
+
+   Opting in is `data-motion="fade"`, matching how src/ui components already key off data-tone and
+   data-collapsed. Opacity only — a transform here would defeat the point of the query. */
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="fade"],
+  [data-motion="fade"]::before,
+  [data-motion="fade"]::after {
+    transition-property: opacity !important;
+    transition-duration: var(--dur-1) !important;
+    transition-timing-function: var(--ease-out) !important;
+    animation-duration: var(--dur-1) !important;
+    animation-iteration-count: 1 !important;
   }
 }
