@@ -9,12 +9,22 @@
    introduce a colour, a radius or a font the design system has not already decided. A utility that
    does not resolve to a token is a bug. */
 @import "tailwindcss";
+/* The enter/exit utilities the ShadCN primitives are written against — animate-in, fade-in-0,
+   zoom-in-95, slide-in-from-*. Tailwind v4 does not ship them; without this import they compile to
+   nothing at all and every dialog, popover, select and tooltip appears and disappears with no
+   transition. The package was installed and then not imported, which is worse than not installing
+   it: the class names read as if the motion were there. All of them are opacity and transform
+   only, inside the 300ms ceiling, so design §8 permits them once they actually run. */
+@import "tw-animate-css";
 @import "../src/ui/tokens.css";
 @import "../src/ui/shadcn-bridge.css";
 
-/* Preflight fades placeholders to 50% currentColor, which fails contrast. Design §3.1: steel-500. */
+/* Preflight fades placeholders to 50% currentColor, which fails contrast.
+   --text-secondary, not --text-tertiary: this rule is global, and --text-tertiary is card-only
+   (4.69:1 on --bg-card but 3.76:1 on --bg-sunken, which is the ground PhoneInput and Field's
+   disabled input both use). The customer's very first field was the failing case. */
 ::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   opacity: 1;
 }
 

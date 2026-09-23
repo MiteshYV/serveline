@@ -2,9 +2,9 @@ import { formatISTDate } from '@/core/calendar.ts'
 import { listBatches } from '@/db/repos/index.ts'
 import { Button } from '@/ui/Button.tsx'
 import { currentOutlet } from '../../_lib/session.ts'
-import settings from '../settings/Settings.module.css'
+import { PageHead, Panel } from '../bits.tsx'
+import dash from '../dashboard.module.css'
 import { BatchForm } from './BatchForm.tsx'
-import styles from './Cards.module.css'
 
 export const metadata = { title: 'Cards — ServeLine' }
 
@@ -17,45 +17,57 @@ export default async function CardsPage() {
   const batches = await listBatches(restaurant.id)
 
   return (
-    <div className={settings.page}>
-      <h1 className={settings.title}>Direct Order Cards</h1>
-      <p className={settings.hint}>
-        A card goes in every aggregator delivery: &ldquo;Order direct next time, 10% off.&rdquo; The customer
-        scans it, claims the code, and the second order is yours without commission. One redemption per
-        phone per restaurant.
-      </p>
+    <div className={dash.page}>
+      <PageHead
+        title="Direct Order Cards"
+        meta="A card goes in every aggregator delivery: “Order direct next time, 10% off.” The customer scans it, claims the code, and the second order is yours without commission. One redemption per phone per restaurant."
+      />
 
       {session.role === 'owner' ? (
-        <section className={settings.fieldset}>
-          <h2 className={settings.legend} style={{ margin: 0 }}>New batch</h2>
+        <Panel title="New batch">
           <BatchForm />
-        </section>
+        </Panel>
       ) : (
-        <p className={settings.hint}>Generating a batch is the owner&rsquo;s call. You can print existing batches.</p>
+        <p className={dash.hint}>Generating a batch is the owner&rsquo;s call. You can print existing batches.</p>
       )}
 
-      <section className={settings.fieldset}>
-        <h2 className={settings.legend} style={{ margin: 0 }}>Batches</h2>
+      <Panel title="Batches">
         {batches.length === 0 ? (
-          <p className={settings.hint}>No batches yet. Generate one above and print it.</p>
+          <p className={dash.hint}>No batches yet. Generate one above and print it.</p>
         ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {batches.map((b) => (
-              <li key={b.id} className={styles.row}>
-                <div className={styles.meta}>
-                  <strong><span className="num">{b.qty}</span> cards · {formatISTDate(b.createdAt)}</strong>
-                  <span className={styles.muted}>
-                    <span className="num">{b.redemptionCount}</span> redeemed
-                    {b.placedAt ? ` · placed ${formatISTDate(b.placedAt)}` : ' · not yet placed'}
-                    {b.placementAuditedAt ? ` · audited ${formatISTDate(b.placementAuditedAt)}` : ''}
-                  </span>
-                </div>
-                <Button size="counter" variant="ghost" href={`/app/cards/${b.id}/print`}>Print</Button>
-              </li>
-            ))}
-          </ul>
+          /* This was a <ul> of hand-drawn grid rows — a second table skin beside /today's and
+             /billing's. It is the same tabular data, so it is the same table. */
+          <div className={dash.tableWrap}>
+            <table className={dash.table}>
+              <thead>
+                <tr>
+                  <th>Cards</th>
+                  <th>Generated</th>
+                  <th className={dash.right}>Redeemed</th>
+                  <th>Placement</th>
+                  <th><span className="sr-only">Print</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.map((b) => (
+                  <tr key={b.id}>
+                    <td className="num">{b.qty}</td>
+                    <td className={`${dash.nowrap} num`}>{formatISTDate(b.createdAt)}</td>
+                    <td className={`${dash.right} num`}>{b.redemptionCount}</td>
+                    <td className={dash.muted}>
+                      {b.placedAt ? `Placed ${formatISTDate(b.placedAt)}` : 'Not yet placed'}
+                      {b.placementAuditedAt ? ` · audited ${formatISTDate(b.placementAuditedAt)}` : ''}
+                    </td>
+                    <td className={dash.right}>
+                      <Button size="counter" variant="ghost" href={`/app/cards/${b.id}/print`}>Print</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </section>
+      </Panel>
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { t, type Lang } from '@/ui/i18n.ts'
 import { MenuItemRow, type MenuItemView } from '@/ui/MenuItemRow.tsx'
 import { PhoneInput } from '@/ui/PhoneInput.tsx'
 import { QtyStepper } from '@/ui/QtyStepper.tsx'
+import { PageHead } from '../../bits.tsx'
 import { lookupCustomer, placeManualOrder, type Lookup, type ManualOrderInput, type PlaceResult } from './actions.ts'
 import styles from './ManualOrder.module.css'
 
@@ -166,7 +167,7 @@ export function ManualOrder({ lang, categories, priced, codEnabled }: Props) {
 
   return (
     <div className={`${styles.page} ${count > 0 ? cartReserveClass : ''}`}>
-      <h1 className={styles.title}>{td('manual.title', lang)}</h1>
+      <PageHead title={td('manual.title', lang)} />
 
       {categories.map((c) => (
         <div key={c.id}>

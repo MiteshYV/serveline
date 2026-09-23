@@ -16,7 +16,7 @@ function Tabs({
       data-orientation={orientation}
       orientation={orientation}
       className={cn(
-        "group/tabs flex gap-2 data-[orientation=horizontal]:flex-col",
+        "group/tabs flex gap-[var(--space-8)] data-[orientation=horizontal]:flex-col",
         className
       )}
       {...props}
@@ -24,13 +24,17 @@ function Tabs({
   )
 }
 
+/**
+ * The track. Its height comes from the triggers now rather than a fixed 36px, because the
+ * triggers carry the product's touch floors and a 36px track cannot hold a 44px target.
+ */
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-[orientation=horizontal]/tabs:h-9 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
+  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[var(--space-2)] group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
   {
     variants: {
       variant: {
         default: "bg-muted",
-        line: "gap-1 bg-transparent",
+        line: "gap-[var(--space-4)] bg-transparent",
       },
     },
     defaultVariants: {
@@ -55,6 +59,26 @@ function TabsList({
   )
 }
 
+/**
+ * Four fixes against stock ShadCN, each a measured finding:
+ *
+ * 1. **The inactive label was a 60% alpha on the foreground role — 3.99:1, under the 4.5 floor.** An alpha on a
+ *    token is a new colour nobody computed. `--text-secondary` is the ramp step that clears every
+ *    ground the list can sit on (6.70 card / 5.90 app / 5.37 sunken). Not `--text-tertiary`: that
+ *    one is card-only and this track is `--bg-sunken`.
+ * 2. **36px is below the floor.** The fixed height is gone; the trigger reads `--touch-min` and steps to
+ *    `--touch-counter` or `--touch-dense` with the surface's density (design §6.1).
+ * 3. **Weight 500 on a translatable label.** 500 has no reliable system face in Devanagari or
+ *    Kannada. Active is `--fw-bold`, inactive `--fw-regular` — which also makes selection legible
+ *    without colour, alongside the ground change and the underline.
+ * 4. **The 50% disabled opacity** replaced by the explicit disabled pair (§11.10). Those three
+ *    declarations are important because `data-[state=active]` sets the same properties and is
+ *    emitted after `disabled:` at equal specificity — a disabled *selected* tab otherwise drew
+ *    itself as fully active, with no disabled affordance at all.
+ *
+ * Every `dark:` utility is deleted rather than fixed: tokens.css already re-points these roles,
+ * so a second rule for dark is a second source of truth (ADR 0008).
+ */
 function TabsTrigger({
   className,
   ...props
@@ -63,10 +87,17 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "data-[state=active]:bg-background data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground",
-        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
+        "relative inline-flex flex-1 items-center justify-center gap-[var(--space-6)] rounded-md border border-transparent px-[var(--space-8)] py-[var(--space-4)] whitespace-nowrap",
+        "min-h-[var(--touch-min)] [[data-density=counter]_&]:min-h-[var(--touch-counter)] [[data-density=dense]_&]:min-h-[var(--touch-dense)]",
+        "text-[length:var(--text-label)] leading-[var(--lh-ui)] font-[weight:var(--fw-regular)] text-[var(--text-secondary)]",
+        "transition-colors duration-[var(--dur-2)] outline-none hover:text-[var(--text-primary)]",
+        "group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start",
+        "disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-[color:var(--border-subtle)]! disabled:bg-[var(--bg-sunken)]! disabled:text-[var(--text-disabled)]!",
+        "data-[state=active]:bg-[var(--bg-card)] data-[state=active]:font-[weight:var(--fw-bold)] data-[state=active]:text-[var(--text-primary)]",
+        "group-data-[variant=default]/tabs-list:data-[state=active]:shadow-[var(--elev-1)]",
+        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none",
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[var(--space-16)]",
+        "after:absolute after:bg-[var(--text-primary)] after:opacity-0 after:transition-opacity after:duration-[var(--dur-2)] group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[calc(var(--space-2)*-1)] group-data-[orientation=horizontal]/tabs:after:h-[var(--space-2)] group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:right-[calc(var(--space-4)*-1)] group-data-[orientation=vertical]/tabs:after:w-[var(--space-2)] group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
         className
       )}
       {...props}

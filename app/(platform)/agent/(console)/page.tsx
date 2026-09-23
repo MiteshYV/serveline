@@ -57,10 +57,10 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
       />
 
       <form method="get" action="/agent" className={c.inlineForm}>
-        <Field id="q" label="Search" className="w-[240px]">
+        <Field id="q" label="Search" className={c.fieldWide}>
           {(p) => <input {...p} name="q" type="search" defaultValue={q} className={c.input} placeholder="Name or slug" />}
         </Field>
-        <Field id="stage" label="Stage" className="w-[180px]">
+        <Field id="stage" label="Stage" className={c.fieldMed}>
           {(p) => (
             <select {...p} name="stage" defaultValue={stage ?? ''} className={c.select}>
               <option value="">Any</option>
@@ -68,7 +68,7 @@ export default async function RestaurantsPage({ searchParams }: { searchParams: 
             </select>
           )}
         </Field>
-        <Field id="status" label="Status" className="w-[160px]">
+        <Field id="status" label="Status" className={c.fieldMed}>
           {(p) => (
             <select {...p} name="status" defaultValue={status ?? ''} className={c.select}>
               <option value="">Any</option>

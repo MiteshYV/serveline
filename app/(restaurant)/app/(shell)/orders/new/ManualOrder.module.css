@@ -3,18 +3,17 @@
   gap: var(--space-24);
 }
 
-.title {
-  margin: 0;
-  font-size: var(--text-title);
-  font-weight: var(--fw-bold);
-  line-height: var(--lh-tight);
-}
+/* `.title` was here at --lh-tight and is translated; the page header is now the shared
+   PageHead, whose title takes the --lh-ui 1.45 floor (design §4.2 rule 4). */
 
+/* A category name sits on --bg-app, where --text-tertiary measures 4.13:1 — under the floor.
+   --text-secondary is 5.90:1 there. --text-tertiary is card-only. */
 .category {
   margin: var(--space-8) 0 0;
   font-size: var(--text-caption);
   font-weight: var(--fw-bold);
-  color: var(--text-tertiary);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
 }
 
 .menu {
@@ -63,7 +62,15 @@
   border-radius: var(--radius-3);
   background: var(--bg-card);
   font-size: var(--text-label);
+  line-height: var(--lh-ui);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.choice:active {
+  transform: scale(0.97);
 }
 
 .choice:has(input:checked) {

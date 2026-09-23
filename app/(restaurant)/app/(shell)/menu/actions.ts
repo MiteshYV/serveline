@@ -119,15 +119,27 @@ export async function saveItem(_prev: ItemFormState, form: FormData): Promise<It
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors }
 
+  const { outlet, actor } = await currentOutlet()
+  // The category must belong to this outlet's menu; upsertItem derives menu_id from it.
+  const { getPublishedMenu } = await import('@/db/repos/index.ts')
+  const menu = await getPublishedMenu(outlet.id)
+  if (!menu) return { error: 'Unknown category' }
+
+  // Availability is not a field on this form. It is the immediate switch on /app/menu — one
+  // control, not two — so an edit carries whatever the counter last set, and a new item starts
+  // available. A deferred checkbox here would let a Save undo a sold-out flag set mid-rush.
+  const id = optionalId(str(form, 'id'))
+  const isAvailable = id ? (menu.items.find((i) => i.id === id)?.isAvailable ?? true) : true
+
   const parsed = Item.safeParse({
-    id: optionalId(str(form, 'id')),
+    id,
     categoryId: str(form, 'categoryId'),
     name: str(form, 'name'),
     description: str(form, 'description'),
     pricePaise: price,
     isVeg: form.get('isVeg') === 'on',
     spiceLevel: str(form, 'spiceLevel') || 'none',
-    isAvailable: form.get('isAvailable') === 'on',
+    isAvailable,
     variants,
     optionGroups,
   })
@@ -136,11 +148,7 @@ export async function saveItem(_prev: ItemFormState, form: FormData): Promise<It
     return { error: first ? `${first.path.join('.')}: ${first.message}` : 'Check the form and try again' }
   }
 
-  const { outlet, actor } = await currentOutlet()
-  // The category must belong to this outlet's menu; upsertItem derives menu_id from it.
-  const { getPublishedMenu } = await import('@/db/repos/index.ts')
-  const menu = await getPublishedMenu(outlet.id)
-  if (!menu || !menu.categories.some((c) => c.id === parsed.data.categoryId)) return { error: 'Unknown category' }
+  if (!menu.categories.some((c) => c.id === parsed.data.categoryId)) return { error: 'Unknown category' }
   if (parsed.data.id && !menu.items.some((i) => i.id === parsed.data.id)) return { error: 'Unknown item' }
 
   try {

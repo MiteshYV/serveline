@@ -38,7 +38,7 @@ export function ItemForm({ restaurantId, outletId, categories, item, defaultCate
   const ChildRows = ({ prefix, rows, label }: { prefix: string; rows: Child[]; label: string }) => (
     <table className={c.table}>
       <thead>
-        <tr><th>{label}</th><th className="w-[160px]">Price delta (₹)</th><th className="w-[120px]"></th></tr>
+        <tr><th>{label}</th><th className={c.fieldMed}>Price delta (₹)</th><th className={c.fieldShort}></th></tr>
       </thead>
       <tbody>
         {rows.map((row, i) => {
@@ -134,13 +134,13 @@ export function ItemForm({ restaurantId, outletId, categories, item, defaultCate
               <legend>{g ? g.name : 'New group'}</legend>
               <input type="hidden" name={`${n}.id`} value={g?.id ?? ''} />
               <div className={c.inlineForm}>
-                <Field id={`${n}.name`} label="Group name" className="w-[280px]" error={err(`${n}.name`)}>
+                <Field id={`${n}.name`} label="Group name" className={c.fieldWide} error={err(`${n}.name`)}>
                   {(p) => <input {...p} name={`${n}.name`} defaultValue={g?.name} className={c.input} placeholder={g ? undefined : 'e.g. Served with'} />}
                 </Field>
-                <Field id={`${n}.minSelect`} label="Min" className="w-[72px]" error={err(`${n}.minSelect`)}>
+                <Field id={`${n}.minSelect`} label="Min" className={c.fieldNum} error={err(`${n}.minSelect`)}>
                   {(p) => <input {...p} name={`${n}.minSelect`} defaultValue={g?.minSelect ?? 0} className={`${c.input} num`} inputMode="numeric" />}
                 </Field>
-                <Field id={`${n}.maxSelect`} label="Max" className="w-[72px]" error={err(`${n}.maxSelect`)}>
+                <Field id={`${n}.maxSelect`} label="Max" className={c.fieldNum} error={err(`${n}.maxSelect`)}>
                   {(p) => <input {...p} name={`${n}.maxSelect`} defaultValue={g?.maxSelect ?? 1} className={`${c.input} num`} inputMode="numeric" />}
                 </Field>
                 {g && (

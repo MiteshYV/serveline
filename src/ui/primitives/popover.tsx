@@ -29,7 +29,10 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          // The stock medium shadow had no token behind it, so on the dark ground this panel had no
+          // perceivable edge at all. --elev-2 is design §5.3's "dropdowns, sheets, popovers"
+          // step: a tight shadow in light, a 1px seam in dark.
+          "z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-lg border bg-popover p-[var(--space-16)] text-popover-foreground shadow-[var(--elev-2)] outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className
         )}
         {...props}
@@ -48,17 +51,25 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="popover-header"
-      className={cn("flex flex-col gap-1 text-sm", className)}
+      className={cn("flex flex-col gap-[var(--space-4)]", className)}
       {...props}
     />
   )
 }
 
+/**
+ * Weight 500 is what stock uses, and the system Devanagari and Kannada faces on a low-end Android
+ * synthesise or snap — the same title is Regular on one handset and Bold on the next. Design
+ * §4.2 rule 1 reserves 500/600 for Latin-only content.
+ */
 function PopoverTitle({ className, ...props }: React.ComponentProps<"h2">) {
   return (
     <div
       data-slot="popover-title"
-      className={cn("font-medium", className)}
+      className={cn(
+        "text-[length:var(--text-body)] leading-[var(--lh-ui)] font-[weight:var(--fw-bold)]",
+        className
+      )}
       {...props}
     />
   )
@@ -71,7 +82,10 @@ function PopoverDescription({
   return (
     <p
       data-slot="popover-description"
-      className={cn("text-muted-foreground", className)}
+      className={cn(
+        "text-[length:var(--text-body)] leading-[var(--lh-body)] font-[weight:var(--fw-regular)] text-muted-foreground",
+        className
+      )}
       {...props}
     />
   )

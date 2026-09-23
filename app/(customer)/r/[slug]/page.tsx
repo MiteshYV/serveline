@@ -91,7 +91,11 @@ export default async function MenuPage({ params, searchParams }: Props) {
 
       {code && (
         // Not an order state, so a neutral band (palette law, design §3.2) whether applied or refused.
-        <Band tone="neutral" live={code.ok ? 'off' : 'polite'} className="mx-[var(--space-16)] mt-[var(--space-12)] rounded-[var(--radius-3)]">
+        // `live="off"` for the refusal too: this is server-rendered, so the region already holds
+        // its text when the page loads and a live region that is born with its content never
+        // fires. It is page content — read in document order, above the field that re-enters the
+        // code — not an event, and claiming otherwise in the markup is a promise nothing keeps.
+        <Band tone="neutral" live="off" className="mx-[var(--space-16)] mt-[var(--space-12)] rounded-[var(--radius-3)]">
           {codeMessage(code, lang)}
         </Band>
       )}

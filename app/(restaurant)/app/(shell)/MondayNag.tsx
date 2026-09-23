@@ -32,8 +32,10 @@ type Props = { lang: Lang; weekStart: string }
 /**
  * The Monday aggregator-count nag, design §7.8 to the letter: in normal flow below the header,
  * neutral ground and a steel edge (never a state colour), quick-pick chips before the exact
- * field, Save and an equally legible "Skip this week", a 44px ×. After 20 s with no interaction
- * it collapses to a one-line strip that can be reopened; it never vanishes without saying why.
+ * field, Save and an equally legible "Skip this week", and a × that is a genuine target — 56px
+ * here, because that is the counter floor (design §6.1); §7.8's 44 is the customer one. After
+ * 20 s with no interaction it collapses to a one-line strip that can be reopened; it never
+ * vanishes without saying why.
  */
 export function MondayNag({ lang, weekStart }: Props) {
   const [state, save, saving] = useActionState(saveExternalCount, {} as NagState)
@@ -41,7 +43,7 @@ export function MondayNag({ lang, weekStart }: Props) {
   const [swiggy, setSwiggy] = useState('')
   const [zomato, setZomato] = useState('')
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const ids = { swiggy: useId(), zomato: useId() }
+  const ids = { swiggy: useId(), zomato: useId(), swiggyName: useId(), zomatoName: useId() }
 
   const armIdle = () => {
     if (idle.current) clearTimeout(idle.current)
@@ -64,8 +66,11 @@ export function MondayNag({ lang, weekStart }: Props) {
     )
   }
 
-  const picks = (value: string, set: (v: string) => void) => (
-    <div className={styles.picks} role="group">
+  // The group carries a name: it was `role="group"` with nothing naming it, so a screen-reader
+  // user met five unlabelled number buttons twice over with no way to tell Swiggy's from
+  // Zomato's. It is named by the visible aggregator heading already above it.
+  const picks = (labelledBy: string, value: string, set: (v: string) => void) => (
+    <div className={styles.picks} role="group" aria-labelledby={labelledBy}>
       {PICKS.map((p) => (
         <button
           key={p.label}
@@ -84,7 +89,8 @@ export function MondayNag({ lang, weekStart }: Props) {
     <form action={save} className={styles.nag} onPointerDown={armIdle} onKeyDown={armIdle} onFocus={armIdle} data-week={weekStart}>
       <div className={styles.head}>
         <p className={styles.question}>{t('nag.question', lang)}</p>
-        {/* The × is a genuine 44px target (design §7.8); it does the same as Skip. */}
+        {/* A genuine target, and on the counter that is 56px, not the 44px design §7.8 wrote for
+            the customer surface — everything else in this form is 56 (design §6.1). */}
         <button type="button" className={styles.close} aria-label={t('nag.close', lang)} formNoValidate onClick={() => void skipNag()}>
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
             <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -93,20 +99,33 @@ export function MondayNag({ lang, weekStart }: Props) {
       </div>
       <p className={styles.why}>{t('nag.why', lang)}</p>
 
+      {/* Both exact fields read "or enter exact:" on the screen, which is right — the aggregator's
+          name is the heading directly above. It was also the whole accessible name of both
+          inputs, so a screen reader announced two identical fields. The visible label is
+          unchanged; the aggregator's name is prefixed for assistive technology only, using the
+          global `.sr-only` from tokens.css. */}
       <div className={styles.fields}>
         <div className={styles.aggregator}>
-          <span className={styles.aggName}>{t('nag.swiggy', lang)}</span>
-          {picks(swiggy, setSwiggy)}
-          <Field id={ids.swiggy} label={t('nag.exact', lang)} hint={td('nag.editHint', lang)}>
+          <span className={styles.aggName} id={ids.swiggyName}>{t('nag.swiggy', lang)}</span>
+          {picks(ids.swiggyName, swiggy, setSwiggy)}
+          <Field
+            id={ids.swiggy}
+            label={<><span className="sr-only">{t('nag.swiggy', lang)} · </span>{t('nag.exact', lang)}</>}
+            hint={td('nag.editHint', lang)}
+          >
             {(p) => (
               <input {...p} name="swiggy" className={`${fieldStyles.control} num`} type="text" inputMode="numeric" pattern="[0-9]*" value={swiggy} onChange={(e) => setSwiggy(e.target.value.replace(/\D/g, ''))} required />
             )}
           </Field>
         </div>
         <div className={styles.aggregator}>
-          <span className={styles.aggName}>{t('nag.zomato', lang)}</span>
-          {picks(zomato, setZomato)}
-          <Field id={ids.zomato} label={t('nag.exact', lang)} hint={td('nag.editHint', lang)}>
+          <span className={styles.aggName} id={ids.zomatoName}>{t('nag.zomato', lang)}</span>
+          {picks(ids.zomatoName, zomato, setZomato)}
+          <Field
+            id={ids.zomato}
+            label={<><span className="sr-only">{t('nag.zomato', lang)} · </span>{t('nag.exact', lang)}</>}
+            hint={td('nag.editHint', lang)}
+          >
             {(p) => (
               <input {...p} name="zomato" className={`${fieldStyles.control} num`} type="text" inputMode="numeric" pattern="[0-9]*" value={zomato} onChange={(e) => setZomato(e.target.value.replace(/\D/g, ''))} required />
             )}

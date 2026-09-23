@@ -8,7 +8,10 @@ import { td } from '@/ui/i18n-dashboard.ts'
 import { t } from '@/ui/i18n.ts'
 import { readLang } from '../../_lib/prefs.ts'
 import { currentOutlet } from '../../_lib/session.ts'
-import { publish, setAvailability } from './actions.ts'
+import { PageHead } from '../bits.tsx'
+import dash from '../dashboard.module.css'
+import { AvailabilityToggle } from './AvailabilityToggle.tsx'
+import { publish } from './actions.ts'
 import styles from './Menu.module.css'
 
 export const metadata = { title: 'Menu — ServeLine' }
@@ -19,23 +22,32 @@ export default async function MenuPage() {
   const lang = await readLang()
   const menu = await getPublishedMenu(outlet.id)
   if (!menu) {
-    return <p className="m-0">No menu has been published for this outlet yet. Ask ServeLine to publish your first menu.</p>
+    // The empty branch is still a page: it keeps the same <h1> as the populated one, so the
+    // route never renders without a heading.
+    return (
+      <div className={dash.page}>
+        <PageHead title={td('nav.menu', lang)} />
+        <p className={dash.hint}>No menu has been published for this outlet yet. Ask ServeLine to publish your first menu.</p>
+      </div>
+    )
   }
 
   return (
-    <div className={styles.page}>
-      <div className={styles.head}>
-        <div>
-          <h1 className={styles.title}>{td('nav.menu', lang)}</h1>
-          <p className={styles.meta}>
+    <div className={dash.page}>
+      <PageHead
+        title={td('nav.menu', lang)}
+        meta={
+          <>
             {td('menu.version', lang, { v: menu.menu.version })}
             {menu.menu.publishedAt && <> · <span className="num">{formatISTDateTime(menu.menu.publishedAt)}</span></>}
-          </p>
-        </div>
-        <form action={publish}>
-          <Button size="counter" type="submit">{td('menu.publish', lang)}</Button>
-        </form>
-      </div>
+          </>
+        }
+        actions={
+          <form action={publish}>
+            <Button size="counter" type="submit">{td('menu.publish', lang)}</Button>
+          </form>
+        }
+      />
 
       {menu.categories.map((c) => (
         <section key={c.id} className={styles.category}>
@@ -50,17 +62,12 @@ export default async function MenuPage() {
                 <div className={styles.body}>
                   <span className={styles.name}>{item.name}</span>
                   <span className={`${styles.price} num`}>{formatINR(paise(item.pricePaise))}</span>
+                  {/* Never colour alone (design §3.3): the switch's position is backed by the word. */}
                   {!item.isAvailable && <span className={styles.soldOut}>{t('menu.unavailable', lang)}</span>}
                 </div>
                 <div className={styles.controls}>
-                  <form action={setAvailability}>
-                    <input type="hidden" name="itemId" value={item.id} />
-                    <input type="hidden" name="available" value={item.isAvailable ? '0' : '1'} />
-                    <Button size="counter" variant={item.isAvailable ? 'ghost' : 'primary'} type="submit">
-                      {td(item.isAvailable ? 'menu.markSoldOut' : 'menu.markAvailable', lang)}
-                    </Button>
-                  </form>
-                  <Link href={`/app/menu/${item.id}`} className="inline-flex items-center min-h-[var(--touch-counter)] px-[var(--space-12)]" style={{ fontWeight: 'var(--fw-bold)', color: 'var(--text-primary)' }}>
+                  <AvailabilityToggle itemId={item.id} itemName={item.name} available={item.isAvailable} />
+                  <Link href={`/app/menu/${item.id}`} className={styles.editLink}>
                     {td('menu.edit', lang)}
                   </Link>
                 </div>

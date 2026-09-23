@@ -99,6 +99,24 @@
      Removed rather than repaired: a token that cannot carry the value its name promises is a trap
      for whoever reaches for it next. Use --brand-ink directly. */
 
+  /* ---- The persistent bottom CTA bar (design §7.4) -------------------- */
+  /* A role of its own because it is the one surface that must stay a dark plate in BOTH themes.
+     It used --bg-inverse, which is exactly what "inverse" promises — and in dark that re-points
+     to steel-025, so the cart bar became a near-white slab across the bottom of a dark phone.
+     Light is what §7.4 specifies: steel-900 with white, 16.16:1. Dark is the raised step with
+     primary text, 10.35:1, plus a real seam — at 1.4:1 against the page a raised plate needs an
+     edge to be a plate at all. */
+  --bar-fill: var(--steel-900);
+  --bar-on:   var(--steel-000);
+  --bar-edge: transparent;
+
+  /* ---- Scrim: the wash behind a modal --------------------------------- */
+  /* One value for both themes. Stock ShadCN uses a 50% black wash, which measures 1.08:1 against
+     the dark app ground — in dark it dimmed nothing and the dialog floated over a page that still
+     looked live. Mixing towards the darkest step suppresses what is actually bright behind a
+     dialog in either theme: --text-primary #E1E7EA resolves to #4A5155 under this. */
+  --scrim: color-mix(in srgb, var(--steel-950) 72%, transparent);
+
   /* ---- Focus: brand-independent dual-tone ---------------------------- */
   --focus-inner: #FFFFFF;
   --focus-outer: #192227;
@@ -258,6 +276,12 @@
   --brand-ink:  var(--steel-200);
   --brand-wash: var(--steel-800);
 
+  /* Raised rather than inverted: an inverse bar here would be a near-white slab on a dark phone.
+     1.4:1 against the page, so the seam is what makes it a plate — steel-400 gives 3.44:1. */
+  --bar-fill: var(--steel-800);
+  --bar-on:   var(--steel-100);
+  --bar-edge: var(--steel-400);
+
   --focus-inner: #0F171B;
   --focus-outer: #E1E7EA;
 
@@ -341,6 +365,10 @@
     --brand-on:   var(--steel-950);
     --brand-ink:  var(--steel-200);
     --brand-wash: var(--steel-800);
+
+    --bar-fill: var(--steel-800);
+    --bar-on:   var(--steel-100);
+    --bar-edge: var(--steel-400);
 
     --focus-inner: #0F171B;
     --focus-outer: #E1E7EA;

@@ -108,7 +108,7 @@ export default async function RestaurantPage({ params, searchParams }: { params:
             <Panel title="Admin">
               <form action={setTrialCallLimit} className={c.inlineForm}>
                 <input type="hidden" name="id" value={r.id} />
-                <Field id="trialCallLimit" label="Trial call limit" className="w-[160px]">
+                <Field id="trialCallLimit" label="Trial call limit" className={c.fieldShort}>
                   {(p) => <input {...p} name="trialCallLimit" className={`${c.input} num`} inputMode="numeric" defaultValue={r.trialCallLimit} />}
                 </Field>
                 <Button type="submit" size="dense" variant="ghost">Save</Button>

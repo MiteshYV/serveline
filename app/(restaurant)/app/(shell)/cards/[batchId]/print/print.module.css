@@ -60,14 +60,13 @@
   height: 26mm;
 }
 
-.toolbar {
-  display: flex;
-  gap: var(--space-12);
-  align-items: center;
+/* The page header. Screen only — the sheet that goes to the printer is cards and nothing else. */
+.head {
+  display: grid;
 }
 
 @media print {
-  .toolbar { display: none; }
+  .head { display: none; }
   .sheet { padding: 0; gap: 0; }
   .card { border: none; border-radius: 0; }
 }

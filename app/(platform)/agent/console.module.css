@@ -1,6 +1,12 @@
 /* Agent console — dense, desktop, mouse (design §4.4, §6.1). Real <table>s: the one surface
    where a table is right. Hairline separators (§5.4), tabular numerals (§4.2), 32px targets.
-   Steel only: no state colour off an order state (§3.2), no brand colour but the swatch (§3.5). */
+   Steel only: no state colour off an order state (§3.2), no brand colour but the swatch (§3.5).
+
+   GROUNDS, because --text-tertiary is card-only (it measures 4.69:1 on --bg-card but 4.13:1 on
+   --bg-app, under the 4.5 floor, and no ramp step fixes it): `.nav` and `.panel` paint
+   --bg-card, so tertiary is legal inside them. `.main` paints nothing and sits on the body's
+   --bg-app, and half the console's tables sit directly on it rather than inside a panel — so
+   anything that can render outside a panel uses --text-secondary, which clears every ground. */
 
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
 
@@ -22,8 +28,10 @@
   text-decoration: none;
   white-space: nowrap;
 }
+/* On --bg-card (`.nav`), so tertiary clears 4.5:1. */
 .wordmark small { font-size: var(--text-caption); font-weight: var(--fw-regular); color: var(--text-tertiary); }
-.navLinks { display: flex; gap: var(--space-4); flex: 1; }
+/* 32px targets 4px apart read as one target. Design §6.1: 8px between targets in the console. */
+.navLinks { display: flex; gap: var(--space-8); flex: 1; }
 .navLink {
   display: inline-flex;
   align-items: center;
@@ -37,6 +45,7 @@
 }
 .navLink:hover { color: var(--text-primary); background: var(--bg-sunken); }
 .navLink[aria-current="page"] { color: var(--text-primary); font-weight: var(--fw-bold); }
+/* On --bg-card (`.nav`). */
 .navMeta { display: flex; align-items: center; gap: var(--space-12); color: var(--text-tertiary); font-size: var(--text-caption); }
 
 .main {
@@ -59,9 +68,29 @@
 }
 .title { margin: 0; font-size: var(--text-display); font-weight: var(--fw-bold); line-height: var(--lh-ui); }
 .meta { margin: var(--space-4) 0 0; color: var(--text-secondary); font-size: var(--text-label); }
-.crumbs { margin: 0 0 var(--space-4); font-size: var(--text-caption); color: var(--text-tertiary); }
-.crumbs a { color: inherit; }
+/* Renders on --bg-app (`.main`) and on the login page's bare ground: secondary, not tertiary. */
+.crumbs { margin: 0 0 var(--space-4); font-size: var(--text-caption); color: var(--text-secondary); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+
+/* Links. Tailwind preflight sets `a { color: inherit; text-decoration: inherit }`, so an anchor
+   in a table cell looked exactly like the cell beside it. The affordance is the underline, not a
+   colour: it survives greyscale, colour blindness and the console's steel-only palette (§3.3,
+   SC 1.4.1). Colour stays inherited on purpose — a link inside an attention Band keeps the
+   band's ink and its measured contrast. Buttons rendered as <a> carry their own plate and are
+   never matched here. */
+.link,
+.crumbs a,
+.table a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: var(--space-2);
+}
+.link:hover,
+.crumbs a:hover,
+.table a:hover { text-decoration-thickness: var(--space-2); }
+/* A link is only as tall as its text, so in a 32px row it is a ~20px target. This gives the
+   anchor itself the row's height, clearing SC 2.5.8 without changing the row. */
+.cellLink { display: inline-block; min-height: var(--touch-dense); line-height: var(--touch-dense); }
 
 .panel {
   background: var(--bg-card);
@@ -93,9 +122,10 @@
   vertical-align: middle;
 }
 .table tbody tr:last-child td { border-bottom: 0; }
-.table a { color: var(--text-primary); }
 .right { text-align: right; }
-.muted { color: var(--text-tertiary); }
+/* Half the console's tables sit on --bg-app rather than inside a panel, so this is secondary.
+   The hierarchy is unchanged: 6.70:1 beside primary's 16.16:1 still reads as the quieter line. */
+.muted { color: var(--text-secondary); }
 .nowrap { white-space: nowrap; }
 .pre {
   margin: 0;
@@ -120,9 +150,14 @@
   white-space: nowrap;
 }
 .tagStrong { color: var(--text-primary); border-color: var(--border-strong); }
-.tagQuiet { color: var(--text-disabled); border-style: dashed; }
+/* "Sold out", "Churned", "M2–M5" — real content about a live thing, not a disabled control, so
+   it may not wear --text-disabled (3.12:1 light, 2.41:1 dark). The dashed border is the cue, and
+   it is a shape, not a colour. */
+.tagQuiet { color: var(--text-secondary); border-style: dashed; }
 
-/* Dense controls: 32px, control border at the SC 1.4.11 floor (§5.4), 14px text. */
+/* Dense controls: 32px, control border at the SC 1.4.11 floor (§5.4), 14px text.
+   ONE skin for all three. An input, a select and a textarea on the same filter bar differ in
+   what they do, never in how they look. */
 .input, .select, .textarea {
   width: 100%;
   min-height: var(--touch-dense);
@@ -135,15 +170,32 @@
   font-size: var(--text-body);
   line-height: var(--lh-ui);
 }
+/* A native select draws its arrow inside its own padding box, so it needs end room an input does
+   not; without it the longest option name touches the chevron. The arrow stays the UA's —
+   `color-scheme` in tokens.css already makes it follow the theme, and a hand-drawn SVG chevron
+   would mean a hard-coded colour in this file. */
+.select { appearance: auto; padding-inline-end: var(--space-24); }
 .textarea { padding: var(--space-6) var(--space-8); min-height: calc(var(--touch-dense) * 2); resize: vertical; }
 .input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--state-attention-ink); }
 .input:disabled { background: var(--bg-sunken); color: var(--text-disabled); }
 .check { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--touch-dense); font-size: var(--text-body); cursor: pointer; }
-.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--action-fill); }
+.check input { width: var(--space-16); height: var(--space-16); margin: 0; accent-color: var(--action-fill); }
 .fieldError { margin: var(--space-2) 0 0; font-size: var(--text-caption); line-height: var(--lh-ui); color: var(--state-attention-ink); }
 
+/* Field widths — a content measure, never a pixel literal. `ch` is the width of a "0" in the
+   face and size actually in use, so a field holds the same number of characters at every density
+   and moves with --text-body instead of fighting it (`.pre` above already measures in `ch`).
+   Four widths, applied by what the field holds: a number, a code, an enum, a name.
+   These sit after `.input` deliberately: equal specificity, later source, so they win its 100%. */
+.fieldNum   { width: 8ch; }
+.fieldShort { width: 13ch; }
+.fieldMed   { width: 18ch; }
+.fieldWide  { width: 26ch; }
+.fieldGrow  { flex: 1 1 26ch; min-width: 0; }
+
 .inlineForm { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-8); }
-.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-16); }
+/* The column minimum is the same content measure the field widths use, not a pixel literal. */
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(26ch, 1fr)); gap: var(--space-16); }
 .groupBox { margin: 0; padding: var(--space-12) var(--space-16); border: 1px solid var(--border-separator); border-radius: var(--radius-4); display: grid; gap: var(--space-12); }
 .groupBox legend { padding: 0 var(--space-4); font-size: var(--text-caption); font-weight: var(--fw-bold); color: var(--text-secondary); }
 
@@ -162,9 +214,14 @@
   border-bottom: 1px solid var(--border-separator);
 }
 .step:last-child { border-bottom: 0; }
-.step[data-state="deferred"] { color: var(--text-disabled); }
+/* A deferred step is a readable checklist row, not a disabled control — WCAG exempts inactive
+   controls, not static text describing them. The empty stepMark and the dashed "M2–M5" tag carry
+   the state; the words stay legible. */
+.step[data-state="deferred"] { color: var(--text-secondary); }
 .stepMark { display: inline-flex; width: var(--space-24); height: var(--space-24); align-items: center; justify-content: center; color: var(--text-primary); }
 .step[data-state="todo"] .stepMark { color: var(--border-control); }
+/* The checklist only ever renders inside `.panel` → --bg-card, the one ground where tertiary
+   clears 4.5:1. Move it outside a panel and this has to become secondary. */
 .stepNote { display: block; font-size: var(--text-caption); color: var(--text-tertiary); }
 .stepMeta { font-size: var(--text-caption); color: var(--text-secondary); text-align: right; white-space: nowrap; }
 .step[data-state="deferred"] .stepMeta { color: inherit; }
@@ -187,3 +244,7 @@
 
 .login { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-20); }
 .loginCard { width: 100%; max-width: 400px; display: grid; gap: var(--space-24); }
+
+/* The transcript cell holds what was said, in any of the three languages: prose leading, and
+   never --lh-tight, which clips Devanagari matras and Kannada below-base forms (§4.2). */
+.said { white-space: pre-wrap; line-height: var(--lh-body); }

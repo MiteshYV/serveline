@@ -9,8 +9,13 @@
   gap: var(--space-16);
   min-height: calc(var(--space-64) + env(safe-area-inset-bottom));
   padding: 0 var(--space-16) env(safe-area-inset-bottom);
-  background: var(--bg-inverse);
-  color: var(--text-inverse);
+  /* --bar-fill, not --bg-inverse. "Inverse" does exactly what it says: in dark it re-points to
+     steel-025, which turned the persistent 64px CTA into a near-white slab across the bottom of
+     an otherwise dark phone. --bar-fill stays a dark plate in both themes, and carries its own
+     seam for dark, where it sits only 1.4:1 above the page. Design §7.4. */
+  background: var(--bar-fill);
+  color: var(--bar-on);
+  border-top: 1px solid var(--bar-edge);
   font-size: var(--text-body);
   font-weight: var(--fw-bold);
   line-height: var(--lh-ui);

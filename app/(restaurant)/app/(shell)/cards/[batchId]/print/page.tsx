@@ -4,6 +4,7 @@ import { listCodesForBatch } from '@/db/repos/index.ts'
 import { Button } from '@/ui/Button.tsx'
 import { appOrigin } from '../../../../_lib/origin.ts'
 import { currentOutlet } from '../../../../_lib/session.ts'
+import { PageHead } from '../../../bits.tsx'
 import styles from './print.module.css'
 
 export const metadata = { title: 'Print cards — ServeLine' }
@@ -31,9 +32,14 @@ export default async function PrintBatchPage({ params }: { params: Promise<{ bat
 
   return (
     <div className={styles.sheet}>
-      <div className={styles.toolbar}>
-        <Button size="counter" href="/app/cards" variant="ghost">Back</Button>
-        <span><span className="num">{cards.length}</span> cards — use your browser&rsquo;s Print, then &ldquo;Save as PDF&rdquo;.</span>
+      {/* The one route in the tree that had no <h1>. It is the shared PageHead like every other
+          page; `.head` hides the whole thing at print time, as the toolbar already was. */}
+      <div className={styles.head}>
+        <PageHead
+          title="Print cards"
+          meta={<><span className="num">{cards.length}</span> {cards.length === 1 ? 'card' : 'cards'} — use your browser&rsquo;s Print, then &ldquo;Save as PDF&rdquo;.</>}
+          actions={<Button size="counter" href="/app/cards" variant="ghost">Back</Button>}
+        />
       </div>
       {/* @page must be global CSS; a CSS module cannot carry it. */}
       <style>{'@page { size: 90mm 55mm; margin: 0; }'}</style>

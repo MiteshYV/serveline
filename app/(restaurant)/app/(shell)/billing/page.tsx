@@ -4,7 +4,8 @@ import { formatISTDate, istMonthStart } from '@/core/calendar.ts'
 import { formatINR, paise } from '@/core/money.ts'
 import { channelOrderValue, countAllowanceCalls } from '@/db/repos/index.ts'
 import { currentOutlet } from '../../_lib/session.ts'
-import settings from '../settings/Settings.module.css'
+import { PageHead, Panel } from '../bits.tsx'
+import dash from '../dashboard.module.css'
 import today from '../today/Today.module.css'
 
 export const metadata = { title: 'Billing — ServeLine' }
@@ -49,13 +50,14 @@ export default async function BillingPage() {
   const trialDaysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / 86_400_000)) : null
 
   return (
-    <div className={settings.page}>
-      <h1 className={settings.title}>Billing</h1>
+    <div className={dash.page}>
+      <PageHead title="Billing" />
 
       <div className={today.grid}>
         <div className={today.stat}>
           <span className={today.statLabel}>Plan</span>
-          <span className={today.statValue}>{STATUS[restaurant.status] ?? restaurant.status}</span>
+          {/* A word, not a numeral, so it takes the 1.45 line-height floor. */}
+          <span className={today.statWord}>{STATUS[restaurant.status] ?? restaurant.status}</span>
           <span className={today.statNote}>
             {trialing && trialEnds
               ? `${trialDaysLeft} days left, or ${restaurant.trialCallLimit} AI calls — whichever first`
@@ -78,41 +80,41 @@ export default async function BillingPage() {
         </div>
       </div>
 
-      <section className={settings.fieldset}>
-        <h2 className={settings.legend} style={{ margin: 0 }}>How this month adds up</h2>
-        <table className={today.table}>
-          <tbody>
-            <tr>
-              <td>Subscription{trialing ? ' · free during the trial' : ''}</td>
-              <td className={`${today.right} num`}>{formatINR(invoice.subscriptionPaise)}</td>
-            </tr>
-            <tr>
-              <td>Overage · <span className="num">{invoice.overageCalls}</span> calls beyond {invoice.allowance}</td>
-              <td className={`${today.right} num`}>{formatINR(invoice.overagePaise)}</td>
-            </tr>
-            <tr>
-              <td>{FEE_PERCENT}% on delivered direct orders · <span className="num">{formatINR(paise(channelValue))}</span></td>
-              <td className={`${today.right} num`}>{formatINR(invoice.feePaise)}</td>
-            </tr>
-            <tr><th>Total</th><th className={`${today.right} num`}>{formatINR(invoice.totalPaise)}</th></tr>
-          </tbody>
-        </table>
-        <p className={settings.hint}>
+      <Panel title="How this month adds up">
+        <div className={dash.tableWrap}>
+          <table className={dash.table}>
+            <tbody>
+              <tr>
+                <td>Subscription{trialing ? ' · free during the trial' : ''}</td>
+                <td className={`${dash.right} num`}>{formatINR(invoice.subscriptionPaise)}</td>
+              </tr>
+              <tr>
+                <td>Overage · <span className="num">{invoice.overageCalls}</span> calls beyond {invoice.allowance}</td>
+                <td className={`${dash.right} num`}>{formatINR(invoice.overagePaise)}</td>
+              </tr>
+              <tr>
+                <td>{FEE_PERCENT}% on delivered direct orders · <span className="num">{formatINR(paise(channelValue))}</span></td>
+                <td className={`${dash.right} num`}>{formatINR(invoice.feePaise)}</td>
+              </tr>
+              <tr><th>Total</th><th className={`${dash.right} num`}>{formatINR(invoice.totalPaise)}</th></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className={dash.hint}>
           Orders entered by staff by hand carry no fee. Cancelled orders carry no fee. The fee funds the AI; the
           subscription funds the platform.
         </p>
-      </section>
+      </Panel>
 
-      <section className={settings.fieldset}>
-        <h2 className={settings.legend} style={{ margin: 0 }}>Payment</h2>
-        <p className={settings.hint}>
+      <Panel title="Payment">
+        <p className={dash.hint}>
           Invoices are collected by a UPI Autopay mandate set up during onboarding, with a payment link as the
           fallback. The mandate, the monthly invoice and the usage ledger arrive with milestone M5.
         </p>
         {restaurant.trialStartedAt && (
-          <p className={settings.hint}>Trial started {formatISTDate(restaurant.trialStartedAt)}.</p>
+          <p className={dash.hint}>Trial started {formatISTDate(restaurant.trialStartedAt)}.</p>
         )}
-      </section>
+      </Panel>
     </div>
   )
 }

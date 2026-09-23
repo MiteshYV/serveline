@@ -27,13 +27,6 @@
   gap: var(--space-8);
 }
 
-.groupTitle {
-  margin: 0;
-  font-size: var(--text-caption);
-  font-weight: var(--fw-bold);
-  color: var(--text-tertiary);
-}
-
 /* Cards separate with an 8px gap on the app ground (design §5.4), not a hairline. */
 .list {
   display: grid;
@@ -64,15 +57,8 @@
   margin-bottom: var(--space-8);
 }
 
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
+/* `.srOnly` was defined here. It is now the global `.sr-only` in tokens.css — one definition for
+   the whole product, which is what stops a fourth copy being written. */
 
 /* ---- first run (design §7.9): "Preview my page" plus the QR to print ---- */
 .qr {

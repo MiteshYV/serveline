@@ -85,11 +85,22 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
             {/* Server-rendered from the versioned notice; the markup is ours, the words are the notice's. */}
             <div className={styles.notice} dangerouslySetInnerHTML={{ __html: noticeHtml(lang, restaurant.name) }} />
           </div>
+          {/* The error is wired to the box it describes and the box takes focus on arrival.
+              It used to sit in a server-rendered role="status": a live region that already holds
+              its content when the page loads never fires, so it announced nothing at all. */}
           <label className={styles.check}>
-            <input type="checkbox" name="agree" required />
+            <input
+              type="checkbox"
+              id="agree"
+              name="agree"
+              required
+              aria-invalid={err === 'consent' || undefined}
+              aria-describedby={err === 'consent' ? 'agree-error' : undefined}
+              autoFocus={err === 'consent'}
+            />
             <span>{t('consent.label', lang, { restaurant: restaurant.name })}</span>
           </label>
-          {err === 'consent' && <p className={styles.error} role="status">{t('consent.required', lang)}</p>}
+          {err === 'consent' && <p id="agree-error" className={styles.error}>{t('consent.required', lang)}</p>}
           <Button type="submit" variant="brand" size="counter" block>{t('checkout.continue', lang)}</Button>
         </form>
       </Step>
@@ -105,13 +116,17 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
       return (
         <Step n={3} lang={lang} title={t('checkout.address', lang)}>
           {err === 'pincode' && (
-            // Design §7.10: a designed state with a way forward, not an error code.
-            <Band
-              tone="attention"
-              action={tel && <Button href={`tel:${tel}`} variant="ghost">{t('address.call', lang, { restaurant: restaurant.name })}</Button>}
-            >
-              {t('address.notServed', lang, { restaurant: restaurant.name, pincode: param(sp, 'pin') })}
-            </Band>
+            // Design §7.10: a designed state with a way forward, not an error code. The sentence
+            // is written once, here, where the call button sits beside it; the pincode field
+            // points at this id instead of printing the same words a second time.
+            <div id="pincode-notserved">
+              <Band
+                tone="attention"
+                action={tel && <Button href={`tel:${tel}`} variant="ghost">{t('address.call', lang, { restaurant: restaurant.name })}</Button>}
+              >
+                {t('address.notServed', lang, { restaurant: restaurant.name, pincode: param(sp, 'pin') })}
+              </Band>
+            </div>
           )}
           {addresses.length > 0 && (
             <section className={styles.form} aria-labelledby="saved-h">
@@ -130,7 +145,6 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
           <form action={saveAddressAction} className={styles.form}>
             {hidden}
             <h3 className={styles.subhead}>{t('address.new', lang)}</h3>
-            {err === 'address' && <p className={styles.error} role="status">{t('address.pincodeInvalid', lang)}</p>}
             <Field id="line1" label={t('address.line1', lang)}>
               {(input) => <input {...input} name="line1" className={fieldStyles.control} required minLength={3} maxLength={200} autoComplete="street-address" />}
             </Field>
@@ -140,9 +154,32 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
             <Field id="area" label={t('address.area', lang)}>
               {(input) => <input {...input} name="area" className={fieldStyles.control} required minLength={2} maxLength={80} autoComplete="address-level3" />}
             </Field>
-            <Field id="pincode" label={t('address.pincode', lang)} error={err === 'pincode' ? t('address.notServed', lang, { restaurant: restaurant.name, pincode: param(sp, 'pin') }) : undefined}>
+            {/* Field does the aria-describedby / aria-invalid wiring; `err=address` is the
+                pincode message, so it belongs here rather than loose above the form. Focusing the
+                invalid field is what actually reaches a screen reader on a server-rendered page.
+                `err=pincode` is described by the band above rather than repeated under the field —
+                one sentence, one place, and focusing the field still reads it out. */}
+            <Field
+              id="pincode"
+              label={t('address.pincode', lang)}
+              error={err === 'address' ? t('address.pincodeInvalid', lang) : undefined}
+            >
               {(input) => (
-                <input {...input} name="pincode" className={`${fieldStyles.control} num`} type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="postal-code" defaultValue={param(sp, 'pin')} />
+                <input
+                  {...input}
+                  name="pincode"
+                  className={`${fieldStyles.control} num`}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  required
+                  autoComplete="postal-code"
+                  defaultValue={param(sp, 'pin')}
+                  aria-invalid={err === 'address' || err === 'pincode' || undefined}
+                  aria-describedby={err === 'pincode' ? 'pincode-notserved' : input['aria-describedby']}
+                  autoFocus={err === 'address' || err === 'pincode'}
+                />
               )}
             </Field>
             <Button type="submit" variant="brand" size="counter" block>{t('address.saveAndContinue', lang)}</Button>

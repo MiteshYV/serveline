@@ -17,8 +17,12 @@ import { StateGlyph } from '@/ui/StateGlyph.tsx'
 import { StatusChip } from '@/ui/StatusChip.tsx'
 import { ThemeToggle } from '@/ui/ThemeToggle.tsx'
 import { AGENT_THEME_COOKIE, isTheme } from '@/ui/theme.ts'
+import { PageHead } from '../bits.tsx'
 import { setPlatformTheme } from '../(console)/actions.ts'
-import { LiveOrderCard, MenuDemo, ResendDemo, StepperDemo } from './demos.tsx'
+import {
+  AlertDialogDemo, DialogDemo, DropdownDemo, LiveOrderCard, MenuDemo, PopoverDemo, ResendDemo,
+  SelectDemo, StepperDemo, SwitchDemo, TabsDemo, ToastDemo, TooltipDemo,
+} from './demos.tsx'
 
 export const metadata = { title: 'ServeLine styleguide' }
 
@@ -70,7 +74,9 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   return (
     <section className="grid gap-[var(--space-16)]">
       <header>
-        <h2 className="m-0 font-bold" style={{ fontSize: 'var(--text-title)' }}>{title}</h2>
+        {/* `font-bold` emitted a literal 700 into the stylesheet — the one weight in this file that
+            was not a token. --fw-bold is the same 700 and moves with tokens.css if it ever changes. */}
+        <h2 className="m-0" style={{ fontSize: 'var(--text-title)', fontWeight: 'var(--fw-bold)' }}>{title}</h2>
         {note && <p className="m-0" style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-label)' }}>{note}</p>}
       </header>
       {children}
@@ -81,7 +87,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid gap-[var(--space-8)]">
-      <span style={{ fontSize: 'var(--text-caption)', color: 'var(--text-tertiary)' }}>{label}</span>
+      <span style={{ fontSize: 'var(--text-caption)', color: 'var(--text-secondary)' }}>{label}</span>
       <div className="flex flex-wrap items-center gap-[var(--space-12)]">{children}</div>
     </div>
   )
@@ -96,21 +102,30 @@ export default async function StyleguidePage() {
   const theme = isTheme(chosenTheme) ? chosenTheme : 'os'
   return (
     <main className="mx-auto max-w-[960px] grid gap-[var(--space-48)] px-[var(--space-20)] py-[var(--space-32)]">
-      <header className="flex flex-wrap items-center justify-between gap-[var(--space-16)]">
-        <div>
-          <h1 className="m-0 font-bold" style={{ fontSize: 'var(--text-display)' }}>Steel &amp; Enamel</h1>
-          <p className="m-0" style={{ color: 'var(--text-secondary)' }}>
-            Every component, every state. Sections are wrapped in their native density.
-          </p>
+      <PageHead
+        title={<>Steel &amp; Enamel</>}
+        meta="Every component, every state. Sections are wrapped in their native density; the toggle re-renders the whole page from the tokens, which is how both themes get checked."
+        actions={
+          <ThemeToggle
+            action={setPlatformTheme}
+            current={theme}
+            size="dense"
+            legend="Theme"
+            labels={{ os: 'OS', light: 'Light', dark: 'Dark' }}
+          />
+        }
+      />
+
+      <Section title="ThemeToggle" note="ADR 0002 §3 — the staff light/dark control, one per surface. Three submit buttons and a cookie, so the choice survives a reload and works with no JavaScript. Pressed state is aria-pressed, never colour alone.">
+        <Row label="dense (console)">
+          <ThemeToggle action={setPlatformTheme} current={theme} size="dense" legend="Theme" labels={{ os: 'OS', light: 'Light', dark: 'Dark' }} />
+        </Row>
+        <div data-density="counter">
+          <Row label="counter (dashboard)">
+            <ThemeToggle action={setPlatformTheme} current={theme} size="counter" legend="Theme" labels={{ os: 'OS', light: 'Light', dark: 'Dark' }} />
+          </Row>
         </div>
-        <ThemeToggle
-          action={setPlatformTheme}
-          current={theme}
-          size="dense"
-          legend="Theme"
-          labels={{ os: 'OS', light: 'Light', dark: 'Dark' }}
-        />
-      </header>
+      </Section>
 
       <Section title="StateGlyph" note="§3.3 — six inline SVGs, each with a <title>. Shape, not colour alone.">
         <Row label="six tones (coloured by the parent)">
@@ -232,6 +247,28 @@ export default async function StyleguidePage() {
           <Row label="Hindi labels"><div className="w-full"><LiveOrderCard order={{ ...baseOrder, number: '1293', status: 'confirmed' }} lang="hi" /></div></Row>
           <Row label="delivered (collapsed, drained)"><div className="w-full"><LiveOrderCard order={{ ...delivery, number: '1280', status: 'delivered', placedAt: minutesAgo(65) }} lang="en" /></div></Row>
           <Row label="cancelled (collapsed, drained)"><div className="w-full"><LiveOrderCard order={{ ...baseOrder, number: '1279', status: 'cancelled', placedAt: minutesAgo(80) }} lang="en" /></div></Row>
+        </div>
+      </Section>
+
+      <Section title="Primitives (ShadCN)" note="ADR 0008 — Radix behaviour, Steel &amp; Enamel palette. Every utility they use resolves to a token through shadcn-bridge.css, so they are correct in both themes with no `dark:` anywhere. Open each one in both themes; that is what this section is for.">
+        <div data-density="dense" className="grid gap-[var(--space-16)]">
+          <Row label="Select · Switch + Label">
+            <SelectDemo />
+            <SwitchDemo />
+          </Row>
+          <Row label="Tabs"><TabsDemo /></Row>
+          <Row label="DropdownMenu · Popover · Tooltip">
+            <DropdownDemo />
+            <PopoverDemo />
+            <TooltipDemo />
+          </Row>
+          <Row label="Dialog (steel plate) · AlertDialog (danger — the only permitted modal, §11.20)">
+            <DialogDemo />
+            <AlertDialogDemo />
+          </Row>
+          <Row label="Sonner — a confirmation that has nothing to retry; an error with a retry is a Band (§11.15)">
+            <ToastDemo />
+          </Row>
         </div>
       </Section>
 

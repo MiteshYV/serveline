@@ -5,6 +5,8 @@ import { Band } from '@/ui/Band.tsx'
 import { Button } from '@/ui/Button.tsx'
 import { Field } from '@/ui/Field.tsx'
 import fieldStyles from '@/ui/Field.module.css'
+import { Panel } from '../../bits.tsx'
+import dash from '../../dashboard.module.css'
 import { saveItem, type ItemFormState } from '../actions.ts'
 import styles from '../Menu.module.css'
 
@@ -17,7 +19,8 @@ export type ItemFormData = {
   price: string
   isVeg: boolean
   spiceLevel: 'none' | 'mild' | 'medium' | 'hot'
-  isAvailable: boolean
+  /* No `isAvailable`: availability is the immediate switch on /app/menu, and `saveItem` carries
+     the item's current value through. A field here would be a second control for one fact. */
   variants: { id: string; name: string; delta: string }[]
   optionGroups: { id: string; name: string; min: number; max: number; options: { id: string; name: string; delta: string }[] }[]
 }
@@ -49,7 +52,7 @@ export function ItemForm({ item, categories }: Props) {
   const groups = pad(item.optionGroups, { id: '', name: '', min: 0, max: 1, options: [] }, BLANK_GROUPS, MAX_GROUPS)
 
   return (
-    <form action={act} className={styles.form}>
+    <form action={act} className={dash.form}>
       {state.error && <Band tone="attention">{state.error}</Band>}
       {item.id && <input type="hidden" name="id" value={item.id} />}
 
@@ -82,14 +85,20 @@ export function ItemForm({ item, categories }: Props) {
             </select>
           )}
         </Field>
+        {/* "Available" was a second, deferred copy of the sold-out control on /app/menu, so
+            saving this form could silently undo a sold-out flag set at the counter minutes
+            earlier. Availability is now the immediate switch on the list, and `saveItem`
+            carries the item's current value through untouched. */}
         <div className="grid gap-[var(--space-4)]">
-          <label className={styles.check}><input type="checkbox" name="isVeg" defaultChecked={item.isVeg} /> Vegetarian</label>
-          <label className={styles.check}><input type="checkbox" name="isAvailable" defaultChecked={item.isAvailable} /> Available</label>
+          <label className={dash.check}><input type="checkbox" name="isVeg" defaultChecked={item.isVeg} /> Vegetarian</label>
         </div>
       </div>
 
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Variants — half and full, sizes. The price above is the base; a variant adds or subtracts.</legend>
+      {/* The legend is the group's name, not its explanation: `.panelTitle` is --text-title, which
+          is 24px at counter density, and a two-clause sentence at that size is the scan layer
+          carrying lean-in content (design §4.5). The sentence is a hint under it. */}
+      <Panel as="fieldset" title="Variants">
+        <p className={dash.hint}>Half and full, or sizes. The price above is the base; a variant adds to it or subtracts from it.</p>
         {variants.map((v, i) => (
           <div key={i} className={styles.grid2}>
             <input type="hidden" name={`variant[${i}].id`} value={v.id} />
@@ -101,11 +110,11 @@ export function ItemForm({ item, categories }: Props) {
             </Field>
           </div>
         ))}
-      </fieldset>
+      </Panel>
 
       {groups.map((g, gi) => (
-        <fieldset key={gi} className={styles.fieldset}>
-          <legend className={styles.legend}>Option group {gi + 1} — extras or a required choice</legend>
+        <Panel key={gi} as="fieldset" title={`Option group ${gi + 1}`}>
+          <p className={dash.hint}>Extras, or a choice the customer must make.</p>
           <input type="hidden" name={`group[${gi}].id`} value={g.id} />
           <div className={styles.grid3}>
             <Field id={`group-${gi}-name`} label="Group name" error={err(`group[${gi}].name`)}>
@@ -129,7 +138,7 @@ export function ItemForm({ item, categories }: Props) {
               </Field>
             </div>
           ))}
-        </fieldset>
+        </Panel>
       ))}
 
       <div className="flex gap-[var(--space-16)]">

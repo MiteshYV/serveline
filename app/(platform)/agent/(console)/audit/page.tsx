@@ -2,6 +2,7 @@ import { requirePlatform } from '@/auth/session.ts'
 import { AUDIT_PAGE_SIZE, listAuditEntities, listAuditLog } from '@/db/repos/index.ts'
 import { Button } from '@/ui/Button.tsx'
 import { Field } from '@/ui/Field.tsx'
+import { t } from '@/ui/i18n.ts'
 import { PageHead, Panel, Tag } from '../../bits.tsx'
 import c from '../../console.module.css'
 import { fmtIst, shortId } from '../../format.ts'
@@ -40,7 +41,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
       />
 
       <form method="get" action="/agent/audit" className={c.inlineForm}>
-        <Field id="entity" label="Entity" className="w-[220px]">
+        <Field id="entity" label="Entity" className={c.fieldWide}>
           {(p) => (
             <select {...p} name="entity" defaultValue={entity} className={c.select}>
               <option value="">All entities</option>
@@ -49,7 +50,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
           )}
         </Field>
         <Button type="submit" size="dense" variant="ghost">Apply</Button>
-        {entity && <Button href="/agent/audit" size="dense" variant="ghost">Clear</Button>}
+        {entity && <Button href="/agent/audit" size="dense" variant="ghost">{t('empty.clearFilters', 'en')}</Button>}
       </form>
 
       <div className={c.tableWrap}>

@@ -1,28 +1,7 @@
-.page {
-  display: grid;
-  gap: var(--space-24);
-}
-
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.title {
-  margin: 0;
-  font-size: var(--text-title);
-  font-weight: var(--fw-bold);
-  line-height: var(--lh-tight);
-}
-
-.meta {
-  margin: 0;
-  font-size: var(--text-label);
-  color: var(--text-secondary);
-}
+/* The page header, the panel, the form grid, the hints and the 56px checkbox come from
+   dashboard.module.css. `.title` lived here at --lh-tight and is translated, so it clipped
+   Devanagari matras and Kannada below-base forms; `.fieldset` drew the panel as a
+   --border-separator outline where the rest of the dashboard draws an --elev-1 card. */
 
 .category {
   display: grid;
@@ -40,6 +19,7 @@
   margin: 0;
   font-size: var(--text-subtitle);
   font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
 }
 
 .list {
@@ -63,6 +43,7 @@
   border-bottom: 1px solid var(--border-separator);
 }
 
+/* The row's ground is --bg-card, where --text-tertiary measures 4.69:1 and is legal. */
 .item[data-unavailable] .name {
   color: var(--text-tertiary);
 }
@@ -84,38 +65,46 @@
   color: var(--text-secondary);
 }
 
+/* The word, beside the control: availability is never carried by the switch's colour alone
+   (design §3.3). */
 .soldOut {
   font-size: var(--text-caption);
   font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
   color: var(--text-secondary);
 }
 
 .controls {
   display: flex;
+  align-items: center;
   gap: var(--space-12);
+}
+
+/* The availability switch needs nothing here: src/ui/primitives/switch.tsx makes its Root the
+   target and reads --touch-counter under [data-density="counter"], which this surface sets. */
+
+.editLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-counter);
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-3);
+  color: var(--text-primary);
+  font-size: var(--text-label);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.editLink:active {
+  transform: scale(0.97);
 }
 
 /* ---- item editor ---- */
-.form {
-  display: grid;
-  gap: var(--space-20);
-}
-
-.fieldset {
-  margin: 0;
-  padding: var(--space-12);
-  border: 1px solid var(--border-separator);
-  border-radius: var(--radius-4);
-  display: grid;
-  gap: var(--space-12);
-  background: var(--bg-card);
-}
-
-.legend {
-  padding: 0 var(--space-4);
-  font-size: var(--text-label);
-  font-weight: var(--fw-bold);
-}
 
 .grid2 {
   display: grid;
@@ -127,26 +116,4 @@
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
   gap: var(--space-12);
-}
-
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-8);
-  min-height: var(--touch-counter);
-  font-size: var(--text-label);
-  font-weight: var(--fw-bold);
-}
-
-.check input {
-  width: var(--space-24);
-  height: var(--space-24);
-  margin: 0;
-  accent-color: var(--action-fill);
-}
-
-.error {
-  margin: 0;
-  font-size: var(--text-label);
-  color: var(--state-attention-ink);
 }

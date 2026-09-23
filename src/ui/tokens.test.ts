@@ -167,6 +167,35 @@ test('§13 gate: --text-tertiary is card-only, and clears 4.5:1 there in both th
   assert.deepEqual(failures, [])
 })
 
+/**
+ * The persistent bottom CTA bar is the one surface that must stay a dark plate in BOTH themes.
+ * It used --bg-inverse, which did exactly what "inverse" promises and turned into a near-white
+ * slab across the bottom of a dark phone. In dark the bar sits only 1.4:1 above the page, so the
+ * seam is not decoration — it is what makes it read as a plate at all.
+ */
+test('§13 gate: the cart bar stays a dark plate with a legible word and a real seam', () => {
+  const failures: string[] = []
+  for (const [theme, palette] of THEMES) {
+    const fill = resolve(palette, '--bar-fill')!
+    const on = resolve(palette, '--bar-on')!
+    const word = contrast(on, fill)
+    if (word < 4.5) failures.push(`${theme}: --bar-on on --bar-fill = ${word.toFixed(2)}:1, needs 4.5`)
+
+    const page = resolve(palette, '--bg-app')!
+    const edge = resolve(palette, '--bar-edge')
+    const plate = contrast(fill, page)
+    // Light gets its separation from the plate itself; dark needs the edge to supply it.
+    if (plate < 3) {
+      if (!edge) failures.push(`${theme}: bar is ${plate.toFixed(2)}:1 on the page and has no --bar-edge to separate it`)
+      else {
+        const seam = contrast(edge, fill)
+        if (seam < 3) failures.push(`${theme}: bar is ${plate.toFixed(2)}:1 on the page and its seam is only ${seam.toFixed(2)}:1`)
+      }
+    }
+  }
+  assert.deepEqual(failures, [])
+})
+
 test('dark re-points every role the light palette defines', () => {
   const light = declarations(ruleBody(css, /^:root\s*\{/m))
 
@@ -175,11 +204,17 @@ test('dark re-points every role the light palette defines', () => {
   // motion and touch targets are theme-independent by design.
   const themeIndependent = /^--(steel|fs|fw|lh|text-(display|title|subtitle|body|label|caption)$|font|space|radius|dur|ease|touch|row)/
 
+  // --scrim is deliberately one value in both themes. It mixes towards --steel-950, which is the
+  // darkest step in a ramp that does not move, and its job is the same either way: suppress
+  // whatever is bright behind a dialog. In light that is a white card; in dark it is steel-800 and
+  // steel-100 text. Re-pointing it would mean finding something darker than the darkest step.
+  const CONSTANT_BY_DESIGN = new Set(['--scrim'])
+
   const unthemed = [...light]
     .filter(([name]) => !themeIndependent.test(name) && !manual.has(name) && name !== '--color-scheme')
-    // A role that resolves to another role follows it: --brand-edge is var(--brand-ink), and
-    // --brand-ink is re-pointed. A role whose light value is `none` — --elev-0 — has no colour
-    // to re-point in the first place.
+    .filter(([name]) => !CONSTANT_BY_DESIGN.has(name))
+    // A role that resolves to another role follows it. A role whose light value is `none` —
+    // --elev-0 — has no colour to re-point in the first place.
     .filter(([, value]) => value !== 'none' && !value.startsWith('var('))
     .map(([name]) => name)
 

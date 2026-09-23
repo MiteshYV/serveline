@@ -59,17 +59,20 @@ export default async function AddressLinkPage({ params, searchParams }: Props) {
     <div className={styles.step}>
       <h2 className={styles.stepTitle}>{t('address.confirmTitle', lang)}</h2>
       {err === 'pincode' && (
-        <Band
-          tone="attention"
-          action={tel && <Button href={`tel:${tel}`} variant="ghost">{t('address.call', lang, { restaurant: restaurant.name })}</Button>}
-        >
-          {t('address.notServed', lang, { restaurant: restaurant.name, pincode: param(sp, 'pin') })}
-        </Band>
+        // The sentence is written once, here, where the call button sits beside it (design §7.10);
+        // the pincode field below points at this id rather than repeating the same words.
+        <div id="pincode-notserved">
+          <Band
+            tone="attention"
+            action={tel && <Button href={`tel:${tel}`} variant="ghost">{t('address.call', lang, { restaurant: restaurant.name })}</Button>}
+          >
+            {t('address.notServed', lang, { restaurant: restaurant.name, pincode: param(sp, 'pin') })}
+          </Band>
+        </div>
       )}
       <form action={confirmAddressAction} className={styles.form}>
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="token" value={token} />
-        {err === 'address' && <p className={styles.error} role="status">{t('address.pincodeInvalid', lang)}</p>}
         <Field id="line1" label={t('address.line1', lang)}>
           {(input) => <input {...input} name="line1" className={fieldStyles.control} required minLength={3} maxLength={200} defaultValue={rough?.line1 ?? order.notes ?? ''} autoComplete="street-address" />}
         </Field>
@@ -79,9 +82,32 @@ export default async function AddressLinkPage({ params, searchParams }: Props) {
         <Field id="area" label={t('address.area', lang)}>
           {(input) => <input {...input} name="area" className={fieldStyles.control} required minLength={2} maxLength={80} defaultValue={rough?.area ?? ''} autoComplete="address-level3" />}
         </Field>
-        <Field id="pincode" label={t('address.pincode', lang)}>
+        {/* The validation message is the pincode's, so Field carries it and does the
+            aria-describedby / aria-invalid wiring. The field also takes focus, which is what
+            actually announces on a server render — a role="status" that already holds its text
+            when the page loads never fires. `err=pincode` is described by the band above instead
+            of being printed twice; focusing the field still reads that sentence out. */}
+        <Field
+          id="pincode"
+          label={t('address.pincode', lang)}
+          error={err === 'address' ? t('address.pincodeInvalid', lang) : undefined}
+        >
           {(input) => (
-            <input {...input} name="pincode" className={`${fieldStyles.control} num`} type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required defaultValue={param(sp, 'pin') || rough?.pincode || ''} autoComplete="postal-code" />
+            <input
+              {...input}
+              name="pincode"
+              className={`${fieldStyles.control} num`}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+              defaultValue={param(sp, 'pin') || rough?.pincode || ''}
+              autoComplete="postal-code"
+              aria-invalid={err === 'address' || err === 'pincode' || undefined}
+              aria-describedby={err === 'pincode' ? 'pincode-notserved' : input['aria-describedby']}
+              autoFocus={err === 'address' || err === 'pincode'}
+            />
           )}
         </Field>
 
@@ -91,9 +117,20 @@ export default async function AddressLinkPage({ params, searchParams }: Props) {
               <div className={styles.notice} dangerouslySetInnerHTML={{ __html: noticeHtml(lang, restaurant.name) }} />
             </div>
             <label className={styles.check}>
-              <input type="checkbox" name="agree" required />
+              <input
+                type="checkbox"
+                id="agree"
+                name="agree"
+                required
+                aria-invalid={err === 'consent' || undefined}
+                aria-describedby={err === 'consent' ? 'agree-error' : undefined}
+                autoFocus={err === 'consent'}
+              />
               <span>{t('consent.label', lang, { restaurant: restaurant.name })}</span>
             </label>
+            {/* confirmAddressAction redirects with err=consent and nothing rendered it, so an
+                unticked box came back as a silent no-op. */}
+            {err === 'consent' && <p id="agree-error" className={styles.error}>{t('consent.required', lang)}</p>}
           </>
         )}
 

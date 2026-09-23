@@ -90,7 +90,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
     return (
       <Panel title="Start a call">
         <form onSubmit={onStart} className={c.inlineForm}>
-          <Field id="outletId" label="Outlet" className="w-[280px]">
+          <Field id="outletId" label="Outlet" className={c.fieldWide}>
             {(p) => (
               <select {...p} name="outletId" className={c.select} required>
                 {outlets.map((o) => <option key={o.id} value={o.id}>{o.restaurant} · {o.name}</option>)}
@@ -100,7 +100,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
           <Field
             id="customerId"
             label="Caller"
-            className="w-[280px]"
+            className={c.fieldWide}
             hint="A new caller has no phone number, so the assistant can take the order but cannot place it. Pick a customer to place one."
           >
             {(p) => (
@@ -114,7 +114,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
               </select>
             )}
           </Field>
-          <Field id="lang" label="Language" className="w-[140px]">
+          <Field id="lang" label="Language" className={c.fieldShort}>
             {(p) => (
               <select {...p} name="lang" className={c.select} defaultValue="en">
                 {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
@@ -132,7 +132,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
   return (
     <div className="grid gap-[var(--space-16)]">
       {live.ended && (
-        <Band tone="neutral" action={<a href={`/agent/calls/${live.callId}`}>Review this call</a>}>
+        <Band tone="neutral" action={<a href={`/agent/calls/${live.callId}`} className={c.link}>Review this call</a>}>
           Call ended{live.outcome && <> — <span className="num">{live.outcome}</span></>}
           {live.orderId && <> · order <span className="num">{live.orderId.slice(0, 8)}</span></>}
         </Band>
@@ -157,7 +157,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
             <li key={i} className="grid grid-cols-[max-content_1fr] gap-[var(--space-12)] py-[var(--space-8)] border-b border-[color:var(--border-separator)] last:border-b-0">
               <Tag tone={line.who === 'ai' ? 'strong' : 'default'}>{line.who === 'ai' ? 'AI' : 'Caller'}</Tag>
               <div>
-                <p className="m-0" style={{ whiteSpace: 'pre-wrap' }}>{line.text}</p>
+                <p className={`${c.said} m-0`}>{line.text}</p>
                 {line.toolCalls && line.toolCalls.length > 0 && (
                   <p className={`${c.muted} num`} style={{ margin: 'var(--space-4) 0 0', fontSize: 'var(--text-caption)', wordBreak: 'break-word' }}>
                     {line.toolCalls.map(toolLine).join(' · ')}
@@ -176,7 +176,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
 
         {!live.ended && (
           <form onSubmit={onSend} className={c.inlineForm}>
-            <Field id="say" label="Caller says" className="grow min-w-[280px]">
+            <Field id="say" label="Caller says" className={c.fieldGrow}>
               {(p) => (
                 <input
                   {...p}
@@ -191,7 +191,7 @@ export function Simulator({ outlets, callers }: { outlets: Outlet[]; callers: Ca
                 />
               )}
             </Field>
-            <Field id="turnLang" label="Language" className="w-[140px]">
+            <Field id="turnLang" label="Language" className={c.fieldShort}>
               {(p) => (
                 <select {...p} name="turnLang" className={c.select} value={live.lang} onChange={(e) => setLive((l) => l && { ...l, lang: e.target.value as Lang })} disabled={pending}>
                   {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}

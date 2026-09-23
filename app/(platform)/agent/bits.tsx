@@ -36,7 +36,7 @@ export function Tag({ children, tone = 'default' }: { children: ReactNode; tone?
 /** Design §7.10.1 / §11.15: a persistent band, never a toast. Dismissal is a link to the clean URL. */
 export function ErrorBand({ message, dismissHref }: { message: string; dismissHref: string }) {
   return (
-    <Band tone="attention" action={<a href={dismissHref}>Dismiss</a>}>
+    <Band tone="attention" action={<a href={dismissHref} className={c.link}>Dismiss</a>}>
       {message}
     </Band>
   )

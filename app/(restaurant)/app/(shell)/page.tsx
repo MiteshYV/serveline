@@ -12,6 +12,7 @@ import { toCardWire } from '@/ui/orderWire.ts'
 import { appOrigin } from '../_lib/origin.ts'
 import { readLang, readNagCookie } from '../_lib/prefs.ts'
 import { currentOutlet } from '../_lib/session.ts'
+import { PageHead } from './bits.tsx'
 import { Board } from './Board.tsx'
 import { MondayNag } from './MondayNag.tsx'
 import styles from './Board.module.css'
@@ -47,6 +48,8 @@ export default async function BoardPage() {
     const svg = await QRCode.toString(`${pageUrl}?t=1`, { type: 'svg', margin: 1, width: 160 })
     return (
       <div className={styles.board}>
+        {/* Design §7.8: the nag sits below the header and above the board, in normal flow. */}
+        <PageHead title={td('nav.board', lang)} />
         {nag === 'show' && <MondayNag lang={lang} weekStart={week} />}
         <EmptyState
           kind="first-run"
@@ -68,6 +71,7 @@ export default async function BoardPage() {
 
   return (
     <div className={styles.board}>
+      <PageHead title={td('nav.board', lang)} />
       {nag === 'show' && <MondayNag lang={lang} weekStart={week} />}
       <Board outletId={outlet.id} lang={lang} initial={cards} since={now.toISOString()} ordersToday={ordersToday} />
     </div>

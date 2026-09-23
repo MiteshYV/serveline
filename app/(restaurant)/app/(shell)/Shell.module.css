@@ -11,10 +11,17 @@
 }
 
 /* Design §3.5: the only brand on the dashboard is a 4px identity rail at the top edge. Normalised
-   token, never the raw hex; with no brand configured it is steel, which is the day-one state. */
+   token, never the raw hex; with no brand configured it is steel, which is the day-one state.
+
+   --brand-ink, not --brand-fill. `fill` is a *ground* token: it is the colour a button or a
+   header band is filled with, and it always carries --brand-on text on top. The dark palette
+   re-points it to steel-025, so a rail painted with it was a 4px strip of near-white across the
+   top of a dark counter — the same "white slab" the cart bar shows. `ink` is the mark-on-a-
+   ground role, the one the card's state edge uses for exactly this reason (design §5.4), and
+   tokens.css says so where it removed --brand-edge: "Use --brand-ink directly." */
 .rail {
   height: var(--space-4);
-  background: var(--brand-fill);
+  background: var(--brand-ink);
 }
 
 .bar {
@@ -25,6 +32,7 @@
   padding: 0 var(--space-12);
 }
 
+/* --text-tertiary is legal here: the header's ground is --bg-card (4.69:1), not --bg-app. */
 .wordmark {
   font-size: var(--text-caption);
   font-weight: var(--fw-bold);
@@ -73,6 +81,12 @@
   text-decoration: none;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.navLink:active {
+  transform: scale(0.97);
 }
 
 .navLink[aria-current="page"] {

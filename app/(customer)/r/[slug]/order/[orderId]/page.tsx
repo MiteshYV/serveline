@@ -68,10 +68,15 @@ export default async function OrderStatusPage({ params, searchParams }: Props) {
 
   return (
     <div className={styles.status}>
-      {param(sp, 'withdrawn') === '1' && <Band tone="neutral" live="polite">{t('consent.withdrawn', lang)}</Band>}
+      {/* `live="off"`: this arrives on a fresh navigation after the withdraw redirect, so a live
+          region adds nothing at load — and left polite it fired alongside the status region below,
+          which is one change announced twice. There is one live region on this page. */}
+      {param(sp, 'withdrawn') === '1' && <Band tone="neutral" live="off">{t('consent.withdrawn', lang)}</Band>}
 
       <div className={styles.statusHead} aria-live="polite" aria-atomic="true">
-        <StateGlyph status={order.status} fulfilment={order.fulfilment} lang={lang} />
+        {/* `decorative`: the chip's visible label below is the same string, and this region is
+            atomic, so an announcing glyph read the state out a second time. */}
+        <StateGlyph status={order.status} fulfilment={order.fulfilment} lang={lang} decorative />
         <span className={`${styles.amount} num`}>{formatINR(paise(order.totalPaise))}</span>
         <StatusChip status={order.status} fulfilment={order.fulfilment} variant="outline" lang={lang} />
         <p className={styles.statusMsg}>

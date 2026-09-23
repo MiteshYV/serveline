@@ -6,6 +6,7 @@ import { td } from '@/ui/i18n-dashboard.ts'
 import { signOut } from '../(shell)/actions.ts'
 import { readLang } from '../_lib/prefs.ts'
 import { LoginForm } from './LoginForm.tsx'
+import styles from './Login.module.css'
 
 export const metadata = { title: 'Sign in — ServeLine' }
 
@@ -19,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const lang = await readLang()
   if (session?.restaurantId && suspended) {
     return (
-      <main lang={lang} className="mx-auto w-full max-w-[420px] px-[var(--space-16)] py-[var(--space-40)] grid gap-[var(--space-24)]">
+      <main lang={lang} className={styles.page}>
         <Band tone="neutral">{td('login.suspended', lang)}</Band>
         <form action={signOut}>
           <Button size="counter" variant="ghost" type="submit">{td('login.signOut', lang)}</Button>
@@ -28,12 +29,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     )
   }
   return (
-    <main lang={lang} className="mx-auto w-full max-w-[420px] px-[var(--space-16)] py-[var(--space-40)] grid gap-[var(--space-32)]">
-      <header className="grid gap-[var(--space-4)]">
-        <span style={{ fontSize: 'var(--text-caption)', color: 'var(--text-tertiary)', fontWeight: 'var(--fw-bold)' }}>ServeLine</span>
-        <h1 className="m-0" style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--fw-bold)', lineHeight: 'var(--lh-tight)' }}>
-          {td('login.counter', lang)}
-        </h1>
+    <main lang={lang} className={styles.page}>
+      <header className={styles.head}>
+        <span className={styles.wordmark}>ServeLine</span>
+        <h1 className={styles.title}>{td('login.counter', lang)}</h1>
       </header>
       <LoginForm lang={lang} />
     </main>

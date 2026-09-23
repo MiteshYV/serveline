@@ -5,6 +5,7 @@ import { Button } from '@/ui/Button.tsx'
 import { OtpInput, ResendOtp } from '@/ui/OtpInput.tsx'
 import { PhoneInput } from '@/ui/PhoneInput.tsx'
 import { t } from '@/ui/i18n.ts'
+import c from '../console.module.css'
 import { useFormAction } from '../useFormAction.ts'
 import { sendCode, verifyCode, type SendState, type VerifyState } from './actions.ts'
 
@@ -41,7 +42,7 @@ export function LoginForm() {
       {s.devCode && (
         <Band tone="neutral">
           Mock mode — your code is <span className="num">{s.devCode}</span>. It is also in the{' '}
-          <a href="/agent/sms">mock SMS inbox</a>.
+          <a href="/agent/sms" className={c.link}>mock SMS inbox</a>.
         </Band>
       )}
       {v.limited && <Band tone="attention">{v.error}</Band>}

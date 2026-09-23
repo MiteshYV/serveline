@@ -30,7 +30,7 @@ export function BrandColourField({ defaultValue, error }: { defaultValue: string
             name="brandColour"
             value={hex}
             onChange={(e) => setHex(e.target.value)}
-            className={`${c.input} num w-[120px]`}
+            className={`${c.input} num ${c.fieldShort}`}
             maxLength={7}
             spellCheck={false}
             autoComplete="off"

@@ -24,10 +24,12 @@
   line-height: var(--lh-ui);
 }
 
+/* 56px, not 44: this sits on the counter dashboard, where every other target in the same form
+   is 56 (design §6.1). Design §7.8's "genuine 44px target" is the customer-surface floor. */
 .close {
   flex: none;
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: var(--touch-counter);
+  height: var(--touch-counter);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -36,6 +38,13 @@
   background: transparent;
   color: var(--action-ghost-ink);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.close:active {
+  transform: scale(0.97);
 }
 
 .why {
@@ -80,6 +89,12 @@
   font-weight: var(--fw-bold);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.pick:active {
+  transform: scale(0.97);
 }
 
 .pick[aria-pressed="true"] {

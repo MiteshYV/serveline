@@ -4,12 +4,17 @@ import { Field } from '@/ui/Field.tsx'
 import { FssaiMark } from '@/ui/FssaiMark.tsx'
 import { ErrorBand, PageHead, Panel, Tag } from '../../../../bits.tsx'
 import c from '../../../../console.module.css'
+import { ConfirmDelete } from './ConfirmDelete.tsx'
 import { fmtIst, inr } from '../../../../format.ts'
 import { createMenu, publish, removeCategory, removeItem, saveCategory, setAvailability } from './actions.ts'
 import { loadEditor } from './load.ts'
 
 type Params = Promise<{ id: string }>
 type Search = Promise<Record<string, string | string[] | undefined>>
+
+/** "Dosa, Idli, Vada, Uttapam and 6 more" — enough to recognise what goes, never a wall of text. */
+const listNames = (names: string[], cap = 4) =>
+  names.length <= cap ? names.join(', ') : `${names.slice(0, cap).join(', ')} and ${names.length - cap} more`
 
 /**
  * Build Spec §7 "Menu: ... item add and edit with variants and options. Publishing bumps
@@ -108,19 +113,32 @@ export default async function MenuEditorPage({ params, searchParams }: { params:
                   {ctx}
                   <input type="hidden" name="id" value={cat.id} />
                   <input type="hidden" name="menuId" value={tree.menu.id} />
-                  <input aria-label="Category name" name="name" defaultValue={cat.name} className={`${c.input} w-[280px]`} required />
-                  <input aria-label="Sort order" name="sort" defaultValue={cat.sort} className={`${c.input} num w-[72px]`} inputMode="numeric" />
+                  <input aria-label="Category name" name="name" defaultValue={cat.name} className={`${c.input} ${c.fieldWide}`} required />
+                  <input aria-label="Sort order" name="sort" defaultValue={cat.sort} className={`${c.input} num ${c.fieldNum}`} inputMode="numeric" />
                   <Button type="submit" size="dense" variant="ghost">Save</Button>
                 </form>
               }
               actions={
                 <>
                   <Button href={`/agent/restaurants/${id}/menu/items/new?category=${cat.id}&outlet=${outlet.id}`} size="dense">Add item</Button>
-                  <form action={removeCategory}>
-                    {ctx}
-                    <input type="hidden" name="id" value={cat.id} />
-                    <Button type="submit" size="dense" variant="ghost">Delete category</Button>
-                  </form>
+                  <ConfirmDelete
+                    action={removeCategory}
+                    fields={{ restaurantId: id, outletId: outlet.id, id: cat.id }}
+                    trigger="Delete category"
+                    title={`Delete \u201C${cat.name}\u201D?`}
+                    description={
+                      cat.items.length === 0
+                        ? <>It is empty, so nothing else goes with it. Deleting it cannot be undone.</>
+                        : (
+                          <>
+                            The <span className="num">{cat.items.length}</span> {cat.items.length === 1 ? 'item' : 'items'} in it go too:{' '}
+                            {listNames(cat.items.map((i) => i.name))}. Deleting cannot be undone — and an item that has already
+                            been ordered cannot be deleted at all, so mark that one sold out instead.
+                          </>
+                        )
+                    }
+                    confirm={cat.items.length === 0 ? 'Delete category' : `Delete category and ${cat.items.length} ${cat.items.length === 1 ? 'item' : 'items'}`}
+                  />
                 </>
               }
             >
@@ -153,11 +171,14 @@ export default async function MenuEditorPage({ params, searchParams }: { params:
                           </form>
                         </td>
                         <td className={c.right}>
-                          <form action={removeItem}>
-                            {ctx}
-                            <input type="hidden" name="itemId" value={item.id} />
-                            <Button type="submit" size="dense" variant="ghost">Delete</Button>
-                          </form>
+                          <ConfirmDelete
+                            action={removeItem}
+                            fields={{ restaurantId: id, outletId: outlet.id, itemId: item.id }}
+                            trigger="Delete"
+                            title={`Delete \u201C${item.name}\u201D?`}
+                            description={<>It leaves {outlet.name}&apos;s menu at once and cannot be brought back. To hide it for today instead, mark it sold out.</>}
+                            confirm="Delete item"
+                          />
                         </td>
                       </tr>
                     ))}
@@ -172,10 +193,10 @@ export default async function MenuEditorPage({ params, searchParams }: { params:
             <form action={saveCategory} className={c.inlineForm}>
               {ctx}
               <input type="hidden" name="menuId" value={tree.menu.id} />
-              <Field id="new-category" label="Name" className="w-[280px]">
+              <Field id="new-category" label="Name" className={c.fieldWide}>
                 {(p) => <input {...p} name="name" className={c.input} required />}
               </Field>
-              <Field id="new-category-sort" label="Sort" className="w-[72px]">
+              <Field id="new-category-sort" label="Sort" className={c.fieldNum}>
                 {(p) => <input {...p} name="sort" className={`${c.input} num`} inputMode="numeric" defaultValue={tree.categories.length} />}
               </Field>
               <Button type="submit" size="dense" variant="ghost">Add category</Button>

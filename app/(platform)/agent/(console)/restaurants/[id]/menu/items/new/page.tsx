@@ -1,5 +1,6 @@
 import { requirePlatform } from '@/auth/session.ts'
 import { PageHead, Panel } from '../../../../../../bits.tsx'
+import c from '../../../../../../console.module.css'
 import { loadEditor } from '../../load.ts'
 import { ItemForm } from '../ItemForm.tsx'
 
@@ -19,7 +20,7 @@ export default async function NewItemPage({ params, searchParams }: { params: Pa
       <>
         <PageHead crumbs={crumbs} title="New item" />
         <Panel title="Add a category first">
-          <p className="m-0">An item belongs to a category. <a href={menuHref}>Back to the menu</a>.</p>
+          <p className="m-0">An item belongs to a category. <a href={menuHref} className={c.link}>Back to the menu</a>.</p>
         </Panel>
       </>
     )

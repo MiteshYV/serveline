@@ -34,11 +34,11 @@ function Toaster({ ...props }: ToasterProps) {
     <Sonner
       className="toaster group"
       icons={{
-        success: <CircleCheckIcon className="size-4" aria-hidden />,
-        info: <InfoIcon className="size-4" aria-hidden />,
-        warning: <TriangleAlertIcon className="size-4" aria-hidden />,
-        error: <OctagonXIcon className="size-4" aria-hidden />,
-        loading: <Loader2Icon className="size-4 animate-spin" aria-hidden />,
+        success: <CircleCheckIcon className="size-[var(--space-16)]" aria-hidden />,
+        info: <InfoIcon className="size-[var(--space-16)]" aria-hidden />,
+        warning: <TriangleAlertIcon className="size-[var(--space-16)]" aria-hidden />,
+        error: <OctagonXIcon className="size-[var(--space-16)]" aria-hidden />,
+        loading: <Loader2Icon className="size-[var(--space-16)] animate-spin" aria-hidden />,
       }}
       style={
         {

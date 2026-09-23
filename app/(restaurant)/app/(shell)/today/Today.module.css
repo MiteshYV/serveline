@@ -1,17 +1,22 @@
+/* The table skin moved to dashboard.module.css — /today and /billing drew one table and
+   /cards drew another out of a <ul> of grid rows. One skin now. */
+
 .grid {
   display: grid;
   gap: var(--space-12);
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
-/* A stat tile: label above, number below, the number on the scan layer (design §4.5). */
+/* A stat tile: label above, number below, the number on the scan layer (design §4.5).
+   Drawn as an --elev-1 card like every other panel on the dashboard (design §5.3); it used a
+   --border-separator outline, which is the decorative-separator token doing a panel's job. */
 .stat {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-12);
-  border: 1px solid var(--border-separator);
   border-radius: var(--radius-4);
   background: var(--bg-card);
+  box-shadow: var(--elev-1);
 }
 
 .statLabel {
@@ -20,37 +25,24 @@
   line-height: var(--lh-ui);
 }
 
+/* --lh-tight is legal here and only here: the value is a Latin numeral (design §4.2). */
 .statValue {
   font-size: var(--text-display);
   font-weight: var(--fw-bold);
   line-height: var(--lh-tight);
 }
 
+/* The same tile when the value is a word rather than a number — /billing's plan status. A word
+   can be translated, and 1.30 clips Devanagari and Kannada, so it takes the 1.45 floor. */
+.statWord {
+  font-size: var(--text-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+/* On the tile's --bg-card ground, where --text-tertiary measures 4.69:1. */
 .statNote {
   font-size: var(--text-caption);
   color: var(--text-tertiary);
   line-height: var(--lh-ui);
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-label);
-}
-
-.table th,
-.table td {
-  padding: var(--space-8) var(--space-4);
-  border-bottom: 1px solid var(--border-separator);
-  text-align: left;
-  line-height: var(--lh-ui);
-}
-
-.table th {
-  font-weight: var(--fw-bold);
-  color: var(--text-secondary);
-}
-
-.right {
-  text-align: right;
 }

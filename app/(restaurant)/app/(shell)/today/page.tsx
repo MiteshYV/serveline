@@ -5,7 +5,8 @@ import {
   channelOrderValue, countAllowanceCalls, deliveredCount, externalWeeksBetween, ordersByChannel, topCustomers, topDishes,
 } from '@/db/repos/index.ts'
 import { currentOutlet } from '../../_lib/session.ts'
-import settings from '../settings/Settings.module.css'
+import { PageHead, Panel } from '../bits.tsx'
+import dash from '../dashboard.module.css'
 import styles from './Today.module.css'
 
 export const metadata = { title: 'Today — ServeLine' }
@@ -91,8 +92,8 @@ export default async function TodayPage() {
   })
 
   return (
-    <div className={settings.page}>
-      <h1 className={settings.title}>Today and this month</h1>
+    <div className={dash.page}>
+      <PageHead title="Today and this month" />
 
       <div className={styles.grid}>
         <div className={styles.stat}>
@@ -129,74 +130,77 @@ export default async function TodayPage() {
       </div>
 
       {shareMonth === null && (
-        <p className={settings.hint}>
+        <p className={dash.hint}>
           Direct Order Share needs last week&rsquo;s Swiggy and Zomato counts — the Monday prompt on the board asks for them.
         </p>
       )}
 
-      <section className={settings.fieldset}>
-        <h2 className={settings.legend} style={{ margin: 0 }}>Orders by channel</h2>
-        <table className={styles.table}>
-          <thead>
-            <tr><th>Channel</th><th className={styles.right}>Today</th><th className={styles.right}>This month</th><th className={styles.right}>Value this month</th></tr>
-          </thead>
-          <tbody>
-            {byChannelMonth.length === 0 && byChannelToday.length === 0 ? (
-              <tr><td colSpan={4}>No orders yet this month.</td></tr>
-            ) : (
-              Object.keys(CHANNEL).map((ch) => {
-                const t = byChannelToday.find((r) => r.channel === ch)
-                const m = byChannelMonth.find((r) => r.channel === ch)
-                if (!t && !m) return null
-                return (
-                  <tr key={ch}>
-                    <td>{CHANNEL[ch]}</td>
-                    <td className={`${styles.right} num`}>{t?.orders ?? 0}</td>
-                    <td className={`${styles.right} num`}>{m?.orders ?? 0}</td>
-                    <td className={`${styles.right} num`}>{formatINR(paise(m?.valuePaise ?? 0))}</td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </section>
+      <Panel title="Orders by channel">
+        <div className={dash.tableWrap}>
+          <table className={dash.table}>
+            <thead>
+              <tr><th>Channel</th><th className={dash.right}>Today</th><th className={dash.right}>This month</th><th className={dash.right}>Value this month</th></tr>
+            </thead>
+            <tbody>
+              {byChannelMonth.length === 0 && byChannelToday.length === 0 ? (
+                <tr><td colSpan={4}>No orders yet this month.</td></tr>
+              ) : (
+                Object.keys(CHANNEL).map((ch) => {
+                  const t = byChannelToday.find((r) => r.channel === ch)
+                  const m = byChannelMonth.find((r) => r.channel === ch)
+                  if (!t && !m) return null
+                  return (
+                    <tr key={ch}>
+                      <td>{CHANNEL[ch]}</td>
+                      <td className={`${dash.right} num`}>{t?.orders ?? 0}</td>
+                      <td className={`${dash.right} num`}>{m?.orders ?? 0}</td>
+                      <td className={`${dash.right} num`}>{formatINR(paise(m?.valuePaise ?? 0))}</td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
-      <section className={settings.fieldset}>
-        <h2 className={settings.legend} style={{ margin: 0 }}>Top customers this week</h2>
+      <Panel title="Top customers this week">
         {customers.length === 0 ? (
-          <p className={settings.hint}>No orders linked to a customer profile yet this week.</p>
+          <p className={dash.hint}>No orders linked to a customer profile yet this week.</p>
         ) : (
-          <table className={styles.table}>
-            <thead><tr><th>Customer</th><th className={styles.right}>Orders</th><th className={styles.right}>Value</th></tr></thead>
-            <tbody>
-              {customers.map((c) => (
-                <tr key={c.customerId}>
-                  <td>{c.name ?? c.phone}</td>
-                  <td className={`${styles.right} num`}>{c.orders}</td>
-                  <td className={`${styles.right} num`}>{formatINR(paise(c.valuePaise))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className={dash.tableWrap}>
+            <table className={dash.table}>
+              <thead><tr><th>Customer</th><th className={dash.right}>Orders</th><th className={dash.right}>Value</th></tr></thead>
+              <tbody>
+                {customers.map((c) => (
+                  <tr key={c.customerId}>
+                    <td>{c.name ?? c.phone}</td>
+                    <td className={`${dash.right} num`}>{c.orders}</td>
+                    <td className={`${dash.right} num`}>{formatINR(paise(c.valuePaise))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </section>
+      </Panel>
 
-      <section className={settings.fieldset}>
-        <h2 className={settings.legend} style={{ margin: 0 }}>Top dishes this month</h2>
+      <Panel title="Top dishes this month">
         {dishes.length === 0 ? (
-          <p className={settings.hint}>Nothing ordered yet this month.</p>
+          <p className={dash.hint}>Nothing ordered yet this month.</p>
         ) : (
-          <table className={styles.table}>
-            <thead><tr><th>Dish</th><th className={styles.right}>Plates</th></tr></thead>
-            <tbody>
-              {dishes.map((d) => (
-                <tr key={d.itemId}><td>{d.name}</td><td className={`${styles.right} num`}>{d.qty}</td></tr>
-              ))}
-            </tbody>
-          </table>
+          <div className={dash.tableWrap}>
+            <table className={dash.table}>
+              <thead><tr><th>Dish</th><th className={dash.right}>Plates</th></tr></thead>
+              <tbody>
+                {dishes.map((d) => (
+                  <tr key={d.itemId}><td>{d.name}</td><td className={`${dash.right} num`}>{d.qty}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </section>
+      </Panel>
     </div>
   )
 }

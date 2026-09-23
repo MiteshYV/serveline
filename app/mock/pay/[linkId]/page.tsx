@@ -11,7 +11,11 @@ import { isLang, LANG_COOKIE } from '@/ui/lang.ts'
 import { payMock } from './actions.ts'
 import styles from './pay.module.css'
 
-export const metadata: Metadata = { title: 'Demo payment' }
+/** The title is user-visible, so it comes from the dictionary like every other string here. */
+export async function generateMetadata(): Promise<Metadata> {
+  const l = (await cookies()).get(LANG_COOKIE)?.value
+  return { title: t('mock.title', isLang(l) ? l : 'en') }
+}
 
 /**
  * The mock gateway's payment page (M1 design, "Adapters": a "pay" button fires a realistic signed
@@ -35,8 +39,9 @@ export default async function MockPayPage({ params }: { params: Promise<{ linkId
   const expired = link.status === 'cancelled' || (link.status === 'created' && Date.now() > link.expiresAt.getTime())
 
   return (
-    <div className={styles.page} data-density="comfort" lang={lang}>
-      <p className={styles.eyebrow}>{t('mock.title', lang)}</p>
+    // A landmark, so there is something to skip to, and an <h1>, so the page names itself.
+    <main className={styles.page} data-density="comfort" lang={lang}>
+      <h1 className={styles.eyebrow}>{t('mock.title', lang)}</h1>
       <p className={styles.payee}>{t('mock.paying', lang, { restaurant: restaurant.name })}</p>
       <p className={`${styles.amount} num`}>{amount}</p>
       <p className={styles.note}>{t('mock.note', lang)}</p>
@@ -58,6 +63,6 @@ export default async function MockPayPage({ params }: { params: Promise<{ linkId
           <Button href={statusHref} variant="ghost" size="counter" block>{t('common.cancel', lang)}</Button>
         </form>
       )}
-    </div>
+    </main>
   )
 }

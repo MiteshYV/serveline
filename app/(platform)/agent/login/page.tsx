@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/auth/session.ts'
+import { PageHead } from '../bits.tsx'
 import c from '../console.module.css'
 import { LoginForm } from './LoginForm.tsx'
 
@@ -11,11 +12,11 @@ export default async function AgentLoginPage() {
   return (
     <main className={c.login}>
       <div className={c.loginCard}>
-        <header>
-          <p className={c.crumbs}>ServeLine · agent console</p>
-          <h1 className={c.title}>Sign in</h1>
-          <p className={c.meta}>Agents and admins only. A code is sent by SMS to your registered mobile.</p>
-        </header>
+        <PageHead
+          crumbs="ServeLine · agent console"
+          title="Sign in"
+          meta="Agents and admins only. A code is sent by SMS to your registered mobile."
+        />
         <LoginForm />
       </div>
     </main>

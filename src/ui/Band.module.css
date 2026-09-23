@@ -14,7 +14,16 @@
      is what happened everywhere until now. Opacity only: a connection warning that slides is a
      connection warning that arrives late. */
   opacity: 1;
-  transition: opacity var(--dur-2) var(--ease-out);
+
+  /* `allow-discrete` plus `display` in the list is what gives this an EXIT as well as an entrance.
+     Design §7.10.1 asks for both — "the band disappears on reconnect with a 160ms opacity fade" —
+     but a band is rendered conditionally, so React pulls it out of the DOM the instant the
+     connection returns and there is nothing left to fade. Transitioning `display` discretely holds
+     the element for the duration of the opacity transition, then removes it.
+     Where `allow-discrete` is unsupported the band simply disappears, which is what it did before. */
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    display var(--dur-2) allow-discrete;
 }
 
 @starting-style {
@@ -30,6 +39,17 @@
 
 .action {
   flex: none;
+}
+
+/* Tailwind preflight strips colour and underline from every anchor, so an <a> passed to the
+   `action` slot — "Retry now", "Reopen" — rendered as plain text indistinguishable from the band's
+   own message. Inheriting the band's colour is deliberate: on the received plate the ink is
+   already white, and a link that re-coloured itself there would break the palette law. The
+   underline is what marks it, which also satisfies "never colour alone". */
+.action a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: var(--space-2);
 }
 
 /* Offline / failed request (design §7.10.1). Red at band scale is wash, never plate (§3.4). */

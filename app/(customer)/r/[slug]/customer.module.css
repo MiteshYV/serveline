@@ -24,8 +24,12 @@
   font-weight: var(--fw-bold);
   line-height: var(--lh-ui);
   color: inherit;
-  text-decoration: none;
   min-width: 0;
+}
+
+.bandLink {
+  color: inherit;
+  text-decoration: none;
 }
 
 .lang {
@@ -65,7 +69,8 @@
   text-align: center;
   font-size: var(--text-caption);
   line-height: var(--lh-ui);
-  color: var(--text-tertiary);
+  /* --text-tertiary is card-only: it measures 4.13:1 on --bg-app, under the 4.5 floor. */
+  color: var(--text-secondary);
 }
 
 /* ---- menu page ---- */
@@ -106,7 +111,14 @@
   display: flex;
   gap: var(--space-4);
   overflow-x: auto;
-  padding: 0 var(--space-12);
+  /* The dual-tone ring is painted 4px outside the tab's box, and an overflow scroller clips to
+     its padding box — so a keyboard user saw nothing at all. Pad the scroll box by more than the
+     ring and take exactly the same amount back as a negative margin: the ring now has room
+     inside the scroller and the strip occupies the space in the flow that it always did.
+     scroll-padding keeps the ring off the edge when a tab is scrolled into view. */
+  padding: var(--space-6) var(--space-12);
+  margin-block: calc(-1 * var(--space-6));
+  scroll-padding-inline: var(--space-6);
   background: var(--bg-app);
   border-bottom: 1px solid var(--border-separator);
   scrollbar-width: none;
@@ -137,7 +149,8 @@
 }
 
 .section {
-  scroll-margin-top: calc(var(--touch-min) + var(--space-8));
+  /* Clears the painted height of the sticky tab strip: the tab's 44px plus its ring padding. */
+  scroll-margin-top: calc(var(--touch-min) + var(--space-16));
 }
 
 .sectionTitle {
@@ -258,7 +271,8 @@
   font-size: var(--text-caption);
   font-weight: var(--fw-bold);
   line-height: var(--lh-ui);
-  color: var(--text-tertiary);
+  /* Step 2 of 3 renders on --bg-app, where --text-tertiary is 4.13:1. Card-only token. */
+  color: var(--text-secondary);
 }
 
 .stepTitle {

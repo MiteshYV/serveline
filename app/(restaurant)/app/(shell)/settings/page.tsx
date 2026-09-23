@@ -9,9 +9,10 @@ import { ThemeToggle } from '@/ui/ThemeToggle.tsx'
 import { isTheme } from '@/ui/theme.ts'
 import { THEME_COOKIE, readLang } from '../../_lib/prefs.ts'
 import { currentOutlet } from '../../_lib/session.ts'
+import { PageHead, Panel } from '../bits.tsx'
+import dash from '../dashboard.module.css'
 import { setLang, setTheme } from './actions.ts'
 import { SettingsForm, type SettingsValues } from './SettingsForm.tsx'
-import styles from './Settings.module.css'
 
 export const metadata = { title: 'Settings — ServeLine' }
 
@@ -41,11 +42,10 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>{td('nav.settings', lang)}</h1>
+    <div className={dash.page}>
+      <PageHead title={td('nav.settings', lang)} />
 
-      <section className={styles.fieldset}>
-        <h2 className={styles.legend} style={{ margin: 0 }}>Display</h2>
+      <Panel title="Display">
         <ThemeToggle
           action={setTheme}
           current={theme}
@@ -63,12 +63,12 @@ export default async function SettingsPage() {
           </Field>
           <Button size="counter" variant="ghost" type="submit">{t('common.save', lang)}</Button>
         </form>
-      </section>
+      </Panel>
 
       {session.role === 'owner' ? (
         <SettingsForm values={values} />
       ) : (
-        <p className={styles.hint}>Restaurant settings — hours, delivery, phones, languages — are the owner&rsquo;s to change.</p>
+        <p className={dash.hint}>Restaurant settings — hours, delivery, phones, languages — are the owner&rsquo;s to change.</p>
       )}
     </div>
   )

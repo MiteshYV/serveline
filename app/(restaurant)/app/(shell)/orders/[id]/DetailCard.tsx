@@ -10,6 +10,7 @@ import { t, type Lang } from '@/ui/i18n.ts'
 import { OrderCard } from '@/ui/OrderCard.tsx'
 import { cardFromWire, type CardWire } from '@/ui/orderWire.ts'
 import { convertToCodAction, markCorrectedAction, resendPaymentLink, transition, type ActionResult } from '../../board-actions.ts'
+import styles from './Detail.module.css'
 
 /**
  * The detail page's card and its full action set (Build Spec §7): the same OrderCard as the
@@ -37,11 +38,11 @@ export function DetailCard({ wire, lang }: { wire: CardWire; lang: Lang }) {
     apply(transition({ orderId: current.id, to, ...(reason ? { reason } : {}) }))
 
   return (
-    <div className="grid gap-[var(--space-12)]">
+    <div className={styles.card}>
       {failed && <Band tone="attention">{t('action.retry', lang)}</Band>}
       {notice && <Band tone="neutral">{notice}</Band>}
       <OrderCard order={cardFromWire(current)} lang={lang} onAction={onAction} />
-      <div className="grid gap-[var(--space-16)]">
+      <div className={styles.actions}>
         {current.canResendLink && (
           <Button size="counter" variant="ghost" block onClick={() => apply(resendPaymentLink(current.id), td('detail.linkSent', lang)).catch(() => undefined)}>
             {td('board.resendLink', lang)}
@@ -53,7 +54,7 @@ export function DetailCard({ wire, lang }: { wire: CardWire; lang: Lang }) {
           </Button>
         )}
         {current.correctionFlag ? (
-          <p className="m-0" style={{ fontSize: 'var(--text-label)', color: 'var(--text-secondary)' }}>{td('detail.corrected', lang)}</p>
+          <p className={styles.note}>{td('detail.corrected', lang)}</p>
         ) : (
           <Button size="counter" variant="ghost" block onClick={() => apply(markCorrectedAction(current.id), td('detail.corrected', lang)).catch(() => undefined)}>
             {td('board.markCorrected', lang)}

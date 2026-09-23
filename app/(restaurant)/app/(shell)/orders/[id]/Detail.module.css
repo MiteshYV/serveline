@@ -1,0 +1,105 @@
+/* This page was nine inline `style` objects carrying font size, weight and colour. A CSS module
+   is where those belong: the values are the same tokens, but they are now in one place, they
+   cascade, and no future edit can put a raw value in a style attribute here by accident.
+
+   Ground check (design §3.1 / tokens.css): every rule below renders on --bg-app. The page is a
+   plain grid inside <main>; there is no card behind it. --text-tertiary measures 4.13:1 there,
+   under the 4.5 floor, so the section headings and the timeline that used it now use
+   --text-secondary (5.90:1). --text-tertiary is card-only and cannot be repaired by moving the
+   value — steel-600 is the only step that clears every ground, and that is --text-secondary. */
+
+.page {
+  display: grid;
+  gap: var(--space-24);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.line {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: var(--lh-ui);
+}
+
+.phone {
+  color: var(--text-primary);
+  border-radius: var(--radius-3);
+  -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+  display: inline-block;
+}
+
+.phone:active {
+  transform: scale(0.97);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.quiet {
+  color: var(--text-secondary);
+}
+
+.payments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-6);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+}
+
+.event {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.at {
+  flex: none;
+  min-width: 3.5em;
+  color: var(--text-secondary);
+}
+
+.actor {
+  color: var(--text-secondary);
+}
+
+/* ---- the card and its action set ---- */
+
+.card {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.actions {
+  display: grid;
+  gap: var(--space-16);
+}

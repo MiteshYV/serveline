@@ -282,7 +282,8 @@ export function Board({ outletId, lang, initial, since, ordersToday }: Props) {
         </div>
       </div>
 
-      <p className={styles.srOnly} role="status" aria-live="polite" aria-atomic="true">{announce}</p>
+      {/* The global `.sr-only` from tokens.css; there is no local copy any more. */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announce}</p>
 
       {activeCount === 0 && <EmptyState kind="all-done" lang={lang} ordersToday={todayCount} />}
 

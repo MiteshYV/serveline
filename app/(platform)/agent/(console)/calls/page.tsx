@@ -2,6 +2,7 @@ import { requirePlatform } from '@/auth/session.ts'
 import { CALL_OUTCOMES, CALL_TRANSPORTS, listCalls } from '@/db/repos/index.ts'
 import { Button } from '@/ui/Button.tsx'
 import { Field } from '@/ui/Field.tsx'
+import { t } from '@/ui/i18n.ts'
 import { PageHead, Tag } from '../../bits.tsx'
 import c from '../../console.module.css'
 import { capitalise, fmtIst, inr, shortId } from '../../format.ts'
@@ -57,7 +58,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
       />
 
       <form method="get" action="/agent/calls" className={c.inlineForm}>
-        <Field id="outcome" label="Outcome" className="w-[180px]">
+        <Field id="outcome" label="Outcome" className={c.fieldMed}>
           {(p) => (
             <select {...p} name="outcome" defaultValue={outcome ?? ''} className={c.select}>
               <option value="">Any</option>
@@ -65,7 +66,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
             </select>
           )}
         </Field>
-        <Field id="transport" label="Transport" className="w-[140px]">
+        <Field id="transport" label="Transport" className={c.fieldShort}>
           {(p) => (
             <select {...p} name="transport" defaultValue={transport ?? ''} className={c.select}>
               <option value="">Any</option>
@@ -74,7 +75,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
           )}
         </Field>
         <Button type="submit" size="dense" variant="ghost">Apply</Button>
-        {filtered && <Button href="/agent/calls" size="dense" variant="ghost">Clear</Button>}
+        {filtered && <Button href="/agent/calls" size="dense" variant="ghost">{t('empty.clearFilters', 'en')}</Button>}
       </form>
 
       <div className={c.tableWrap}>
@@ -96,7 +97,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
               <tr key={r.id}>
                 <td>{r.restaurantName} <span className={c.muted}>· {r.outletName}</span></td>
                 <td className={`${c.nowrap} num`}>
-                  <a href={`/agent/calls/${r.id}`} style={{ display: 'inline-block', minHeight: 'var(--touch-dense)', lineHeight: 'var(--touch-dense)' }}>{fmtIst(r.startedAt)}</a> <span className={c.muted}>{shortId(r.id)}</span>
+                  <a href={`/agent/calls/${r.id}`} className={c.cellLink}>{fmtIst(r.startedAt)}</a> <span className={c.muted}>{shortId(r.id)}</span>
                 </td>
                 <td><Tag tone={r.transport === 'exotel' ? 'strong' : 'default'}>{capitalise(r.transport)}</Tag></td>
                 <td>{r.languageDetected ?? '—'}</td>

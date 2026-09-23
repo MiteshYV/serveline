@@ -1,0 +1,208 @@
+/* ==========================================================================
+   Shared dashboard chrome — one page header, one panel, one table.
+
+   Three things were drawn two ways before this file existed: the page header (a bare <h1> on
+   five pages, nothing at all on the board and the order detail), the panel (an --elev-1 card on
+   three surfaces, a grey 1px outline on the report pages), and the table (a <table> on
+   /today and /billing, a hand-rolled <ul> of grid rows on /cards).
+
+   The shape deliberately matches app/(platform)/agent/bits.tsx — PageHead's
+   crumbs / title / meta / actions and Panel's title + body — so the two staff surfaces agree.
+   The sizes come from the role tokens, not from that file, so the counter reads at counter
+   density and the console reads at dense (design §4.4).
+   ========================================================================== */
+
+.page {
+  display: grid;
+  gap: var(--space-24);
+}
+
+/* ---- page header --------------------------------------------------------- */
+
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12) var(--space-24);
+}
+
+/* --lh-ui, never --lh-tight. Every title on this surface is translated, and 1.30 clips
+   Devanagari matras and Kannada below-base forms (design §4.2 rule 4). --lh-tight is for
+   Latin-only numerals and IDs. */
+.title {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+.meta {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+/* Crumbs sit on --bg-app, not on a card, so --text-tertiary (4.13:1 there) is not available.
+   --text-secondary measures 5.90:1 on the app ground. */
+.crumbs {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-caption);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.crumbs a {
+  color: inherit;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* ---- panel: the --elev-1 card, everywhere ------------------------------- */
+
+/* Design §5.3: a panel is a card on the card ground with --elev-1 — a hard 1px hairline plus a
+   1px shadow in light, and a pure seam in dark. The report pages drew a --border-separator
+   outline instead, which is the decorative-separator token doing a panel's job and reads a
+   step lighter than the three surfaces beside it. Works on <section> and on <fieldset>. */
+.panel {
+  display: grid;
+  gap: var(--space-12);
+  align-content: start;
+  margin: 0;
+  padding: var(--space-16) var(--space-12);
+  border: 0;
+  border-radius: var(--radius-4);
+  background: var(--bg-card);
+  box-shadow: var(--elev-1);
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+/* A <legend> needs the padding reset or the browser's own 2px inline padding shows. */
+.panelTitle {
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-title);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-ui);
+}
+
+/* ---- one table skin ------------------------------------------------------ */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+}
+
+.table thead th {
+  padding: var(--space-8);
+  text-align: left;
+  font-size: var(--text-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-control);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-8);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-separator);
+}
+
+/* A <th> inside <tbody> is a row header — /billing's "Total" — not a column head. */
+.table tbody th {
+  padding: var(--space-8);
+  text-align: left;
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-separator);
+}
+
+.table tbody tr:last-child td,
+.table tbody tr:last-child th {
+  border-bottom: 0;
+}
+
+.table a {
+  color: var(--text-primary);
+}
+
+.right {
+  text-align: right;
+}
+
+/* On the card ground inside a panel, so --text-tertiary would be legal; --text-secondary is
+   used instead so the same class is safe if a table is ever put on the app ground. */
+.muted {
+  color: var(--text-secondary);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* ---- forms and prose ----------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: var(--space-20);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--text-secondary);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  color: var(--state-attention-ink);
+}
+
+/* A 56px labelled checkbox (design §6.1). */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--touch-counter);
+  font-size: var(--text-label);
+  line-height: var(--lh-ui);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Press feedback (design §8): transform only, at --dur-1 / --ease-snap. */
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+
+.check:active {
+  transform: scale(0.97);
+}
+
+.check input {
+  width: var(--space-24);
+  height: var(--space-24);
+  margin: 0;
+  accent-color: var(--action-fill);
+}
