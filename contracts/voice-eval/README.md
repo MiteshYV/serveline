@@ -51,22 +51,53 @@ not a measurement.
 
 ## Baseline
 
-Gemini 3.5 Flash Lite (ADR 0006), 22 September 2026, 90 cases:
+Gemini 3.5 Flash Lite (ADR 0006), 23 September 2026, 90 cases:
 
-| | item accuracy | intent accuracy | p50 | p95 |
-|---|---|---|---|---|
-| English | 100% (17/17) | 96% (23/24) | 4.1 s | 5.3 s |
-| Hindi | 100% (26/26) | 96% (25/26) | 4.2 s | 5.4 s |
-| Kannada | 96% (23/24) | 100% (24/24) | 5.0 s | 7.7 s |
+| | item accuracy | intent accuracy | p50 | p95 | errored |
+|---|---|---|---|---|---|
+| English | 100% (20/20) | 100% (26/26) | 4.3 s | 31.8 s | 4 |
+| Hindi | 96% (23/24) | 100% (24/24) | 4.1 s | 10.4 s | 6 |
+| Kannada | 86% (19/22) | 95% (21/22) | 4.6 s | 7.2 s | 8 |
 
-Against §16's targets — 85% at M2, 92% at M3 — with room. Three caveats, all of which matter more
-than the number:
+**Kannada clears §16's M2 target of 85% by one point and misses M3's 92%.** The 22 September run
+recorded 96% there; the difference is not a regression, it is that the earlier run excluded more
+cases. Errored cases are dropped from the score, so rate limiting does not lower a result — it
+raises it, by removing whichever cases happened to fail while the quota was gone. Treat any run
+with a double-digit `errored` column as an upper bound on an upper bound.
 
-- **16 of 90 cases errored on a rate limit**, not on an answer, and are excluded. Roughly a fifth of
-  the set did not run. A paid key would measure all of it.
+Caveats, in the order they matter:
+
 - **This is text.** No recogniser, no phone line, no kitchen noise. The number that decides a pilot
-  is this set read aloud by five people, and it will be lower.
-- **The failures were worth more than the score.** Two were a real gap — a caller asking to cancel an
-  order already placed had nowhere to go, and the prompt now sends them to a person. One was a bad
-  test: the menu calls an item "Kerala Parotta (2 pcs)", so "two parotta" means pieces to a caller
-  and orders to the menu, and the case now says "two plates".
+  is this set read aloud by five people, and it will be lower. Speech-to-text is not wired at all
+  yet (ADR 0007), so the phone half of this has never run end to end.
+- **18 of 90 errored on a rate limit** even at `--gap 5000`. A fifth of the set did not run. This is
+  the free tier; a paid key would measure all of it.
+- **p95 is not a latency measurement.** English's 31.8 s is a single case that hit a retry, not a
+  turn a caller would wait through. p50 is the honest figure.
+
+### The failures are one bug, not four
+
+Every genuine failure in this run is the same shape: **everything after the first item is dropped.**
+
+| case | spoken | got |
+|---|---|---|
+| `kn-order-long` | five items | four `search_menu` calls, **zero** `add_to_cart` |
+| `kn-order-veg-biryani` | Veg Biryani + 2× Butter Naan | Veg Biryani only |
+| `kn-order-curd-rice` | Curd Rice + Buttermilk | Curd Rice only |
+| `hi-order-full-chicken-curry` | Chicken Curry + 2× Kerala Parotta | Parotta quantity 2 → 1 |
+
+Three of the four are Kannada, which accounts for the entire gap to M3. `kn-order-long` is the
+clearest: the assistant searched the menu four times and never committed anything to the cart.
+This is one diagnosable problem and it is what M4's vocabulary tuning exists for — but it may also
+be a loop problem rather than a grounding one, and that is cheaper to check first.
+
+### A note on `kerala-parotta`, for whoever reads this next
+
+The menu calls an item "Kerala Parotta (2 pcs)", so "two parotta" means pieces to a caller and
+orders to the menu. `kn-order-kurma-parotta` was reworded to "two **plates** of kerala parotta"
+after it failed, and it passes now.
+
+`hi-order-full-chicken-curry` has the identical "2 kerala parotta" phrasing, was never reworded,
+and fails every time it runs — three attempts out of three on 23 September. So the set currently
+asks the harder question in Hindi and the easier one in Kannada, which makes the two languages'
+scores not comparable on this item. Either reword both or neither; do not leave it split.

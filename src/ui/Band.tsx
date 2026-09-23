@@ -35,6 +35,9 @@ export function Band({ tone, children, action, live, pulse = false, className }:
       className={`${styles.band} ${styles[tone]}${pulse ? ` ${styles.pulse}` : ''}${className ? ` ${className}` : ''}`}
       role={region === 'assertive' ? 'alert' : region === 'polite' ? 'status' : undefined}
       aria-atomic={region === 'off' ? undefined : true}
+      // Opts the 160ms entrance fade back in under prefers-reduced-motion, at 100ms and opacity
+      // only (tokens.css). The band's arrival still needs to be noticed; it just must not move.
+      data-motion="fade"
     >
       <div className={styles.text}>{children}</div>
       {action && <div className={styles.action}>{action}</div>}

@@ -16,6 +16,25 @@
   line-height: var(--lh-ui);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+
+  /* The bar is rendered only once the cart has something in it, so before this it appeared from
+     nothing across the full width of the viewport — the one genuinely jarring change on the
+     customer path. It now arrives from its own edge, which is where it lives.
+     @starting-style supplies the "before" state a conditionally rendered element does not have.
+     translateY is a percentage, not a pixel count, so it stays correct at any bar height.
+     220ms is inside the design's 300ms ceiling for UI motion. */
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--dur-3) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
+}
+
+@starting-style {
+  .bar {
+    opacity: 0;
+    transform: translateY(100%);
+  }
 }
 
 .summary {

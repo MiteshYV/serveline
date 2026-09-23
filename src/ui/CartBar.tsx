@@ -22,7 +22,10 @@ export const cartReserveClass = styles.reserve
 export function CartBar({ count, totalPaise, href, lang, label }: Props) {
   if (count <= 0) return null
   return (
-    <a href={href} className={styles.bar}>
+    // data-motion="fade" keeps the arrival perceptible under prefers-reduced-motion by restoring
+    // opacity alone at 100ms (tokens.css). The translate is deliberately not restored — a bar that
+    // slides is exactly what that setting exists to prevent — so it simply appears in place.
+    <a href={href} className={styles.bar} data-motion="fade">
       <span className={styles.summary}>
         <span className="num">{count}</span> {t(count === 1 ? 'cart.itemWord' : 'cart.itemsWord', lang)}
         <span className={styles.dot} aria-hidden="true">

@@ -7,6 +7,20 @@
   font-size: var(--text-body);
   font-weight: var(--fw-bold);
   line-height: var(--lh-ui);
+
+  /* Design §7.10.1: the offline band fades in over 160ms rather than appearing from nothing.
+     A band is rendered conditionally, so there is no "before" state for a transition to start
+     from — @starting-style supplies one. Where it is unsupported the band simply appears, which
+     is what happened everywhere until now. Opacity only: a connection warning that slides is a
+     connection warning that arrives late. */
+  opacity: 1;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+
+@starting-style {
+  .band {
+    opacity: 0;
+  }
 }
 
 .text {
@@ -37,8 +51,7 @@
   border-left: 4px solid var(--border-control);
 }
 
-/* Exactly three cycles of transform/opacity, 600ms each, then still (design §8). Under
-   prefers-reduced-motion tokens.css collapses this to one near-zero cycle. */
+/* Exactly three cycles of transform/opacity, 600ms each, then still (design §8). */
 .pulse {
   animation: band-pulse 600ms var(--ease-inout) 3;
   transform-origin: center;
@@ -48,5 +61,23 @@
   50% {
     transform: scale(1.015);
     opacity: 0.92;
+  }
+}
+
+/* Design §8 restores intent selectively: "opacity-only cross-fades at <= 100ms are permitted,
+   transforms are not." The blanket rule in tokens.css collapsed this to a single 0.01ms cycle, so
+   a cook who has asked for reduced motion got no arrival cue at all — and on the board the pulse
+   is what draws the eye to a band that is otherwise static by design.
+   A separate keyframe rather than the generic [data-motion="fade"] hook, because band-pulse
+   carries a transform and reduced motion must not restore it. */
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: band-arrive var(--dur-1) var(--ease-out) 1 !important;
+  }
+}
+
+@keyframes band-arrive {
+  from {
+    opacity: 0.55;
   }
 }
