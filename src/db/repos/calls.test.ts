@@ -55,6 +55,23 @@ describe('calls', () => {
       [75, 20, 2700, 200, 95],
     )
 
+    // Speech arrives on its own rows, one per clip, because transcribing and answering are
+    // separate calls (app/api/v1/voice/calls/[id]/listen). The ON CONFLICT total must read every
+    // column it also increments, twice — stored plus excluded — or the newest add is dropped from
+    // the total while landing in its own column, which under-bills without ever looking wrong.
+    const withSpeech = await calls.addCost(c.id, { llmPaise: 0, tokensIn: 0, tokensOut: 0, sttPaise: 8, sttSeconds: 4 })
+    assert.deepEqual(
+      [withSpeech.sttPaise, withSpeech.sttSeconds, withSpeech.totalPaise],
+      [8, 4, 103],
+      'the speech charge lands in its column AND in the total',
+    )
+    const secondClip = await calls.addCost(c.id, { llmPaise: 0, tokensIn: 0, tokensOut: 0, sttPaise: 5, sttSeconds: 3 })
+    assert.deepEqual(
+      [secondClip.sttPaise, secondClip.sttSeconds, secondClip.llmPaise, secondClip.totalPaise],
+      [13, 7, 75, 108],
+      'clips accrue, and adding speech does not disturb what the model already cost',
+    )
+
     const ended = await calls.endCall(c.id, {
       outcome: 'completed', intent: 'order', languageDetected: 'hi', durationSec: 42, countsTowardAllowance: true,
     })
@@ -71,7 +88,7 @@ describe('calls', () => {
     assert.deepEqual(full.turns.map((t) => t.seq), [1, 2, 3])
     assert.equal(full.turns[1]?.asrConfidence, 0.91)
     assert.deepEqual(full.turns[2]?.toolCalls, toolCalls)
-    assert.equal(full.cost?.totalPaise, 95)
+    assert.equal(full.cost?.totalPaise, 108)
     assert.equal(full.outcome, 'completed', 'the second end did not overwrite the first')
     assert.equal(await calls.getCall('00000000-0000-4000-8000-000000000000'), null)
   })
@@ -83,7 +100,7 @@ describe('calls', () => {
     await calls.endCall(later.id, { outcome: 'handoff', handoffReason: 'abuse', durationSec: 5, countsTowardAllowance: false })
 
     const listed = await calls.listCalls({ outletId: outlet.id, limit: 10 })
-    assert.deepEqual(listed.map((r) => [r.id, r.totalPaise]), [[later.id, 0], [earlier.id, 95]])
+    assert.deepEqual(listed.map((r) => [r.id, r.totalPaise]), [[later.id, 0], [earlier.id, 108]])
     assert.deepEqual((await calls.listCalls({ outcome: 'handoff', limit: 10 })).map((r) => r.id), [later.id])
     assert.deepEqual((await calls.listCalls({ limit: 10, before: later.startedAt })).map((r) => r.id), [earlier.id])
     assert.equal((await calls.listCalls({ limit: 1 })).length, 1)

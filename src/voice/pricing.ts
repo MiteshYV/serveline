@@ -55,3 +55,39 @@ export function costPaise(provider: string, usage: { tokensIn: number; tokensOut
   if (!price) throw new Error(`No LLM price for provider "${provider}"; add it to src/voice/pricing.ts`)
   return paise(Math.ceil((usage.tokensIn * price.inPaisePerMTok + usage.tokensOut * price.outPaisePerMTok) / 1_000_000))
 }
+
+/**
+ * Speech to text, priced by the minute because that is how speech vendors bill.
+ *
+ * Build Spec §10's cost table budgets speech at roughly a third of a call. That assumed Sarvam;
+ * ADR 0007 put whisper on the restaurant's own machine instead, where the per-call speech cost is
+ * zero and the §12 alert has that much more headroom. Worth remembering when Sarvam is switched
+ * on: it is not a swap, it is a new line on the invoice.
+ */
+export const STT_PRICES = {
+  // On the restaurant's own hardware (ADR 0007). Electricity is not a per-second price, and
+  // Build Spec §13 bills calls, not watts — the same reasoning as `ollama` above.
+  whisper: { model: 'large-v3-turbo', paisePerMinute: 0 },
+  // UNVERIFIED. Sarvam publishes ₹0.50 a minute for Saarika at the time of writing, but there is
+  // no account to confirm it against and no invoice to check it with. Re-read this before the
+  // first real call: the ledger feeds §12's ₹15 alert, and a wrong price means a bell that never
+  // rings. See src/adapters/stt/sarvam.ts, which has never received a 200 either.
+  sarvam: { model: 'saarika:v2', paisePerMinute: 50 },
+  // Priced so the loop treats every adapter alike and the ledger path is exercised in mock mode.
+  mock: { model: 'mock', paisePerMinute: 0 },
+} as const satisfies Record<string, { model: string; paisePerMinute: number }>
+
+export type PricedSttProvider = keyof typeof STT_PRICES
+
+/**
+ * One clip's cost, rounded up to the paisa. Seconds rather than minutes at the call site because
+ * that is what an adapter can actually measure; the division happens here, once.
+ *
+ * An unpriced provider throws, for the same reason `costPaise` does: a new adapter is priced
+ * before it goes live, or the ledger under-reports and §12's alert never fires.
+ */
+export function sttCostPaise(provider: string, seconds: number): Paise {
+  const price = (STT_PRICES as Record<string, (typeof STT_PRICES)[PricedSttProvider] | undefined>)[provider]
+  if (!price) throw new Error(`No STT price for provider "${provider}"; add it to src/voice/pricing.ts`)
+  return paise(Math.ceil((Math.max(seconds, 0) * price.paisePerMinute) / 60))
+}

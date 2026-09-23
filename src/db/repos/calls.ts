@@ -134,9 +134,14 @@ export async function addCost(callId: string, input: {
   tokensIn: number
   tokensOut: number
   smsPaise?: number
+  /** What the recogniser charged for this clip, and how much audio it heard (src/adapters/stt). */
+  sttPaise?: number
+  sttSeconds?: number
 }): Promise<CallCostRow> {
   const llmPaise = paise(input.llmPaise)
   const smsPaise = paise(input.smsPaise ?? 0)
+  const sttPaise = paise(input.sttPaise ?? 0)
+  const sttSeconds = Math.max(Math.trunc(input.sttSeconds ?? 0), 0)
   return firstRow(
     await db
       .insert(callCost)
@@ -144,21 +149,29 @@ export async function addCost(callId: string, input: {
         callId,
         llmPaise,
         smsPaise,
+        sttPaise,
+        sttSeconds,
         tokensIn: input.tokensIn,
         tokensOut: input.tokensOut,
-        totalPaise: paise(llmPaise + smsPaise),
+        totalPaise: paise(llmPaise + smsPaise + sttPaise),
       })
       .onConflictDoUpdate({
         target: callCost.callId,
         // In ON CONFLICT ... SET every expression sees the stored row, so the total can read the
-        // columns this statement also increments without double-counting.
+        // columns this statement also increments without double-counting. Every column this
+        // statement adds to must therefore appear twice below — stored plus excluded — and a
+        // column it does not touch appears once. Getting that wrong under-bills silently.
         set: {
           llmPaise: sql`${callCost.llmPaise} + excluded.llm_paise`,
           smsPaise: sql`${callCost.smsPaise} + excluded.sms_paise`,
+          sttPaise: sql`${callCost.sttPaise} + excluded.stt_paise`,
+          sttSeconds: sql`${callCost.sttSeconds} + excluded.stt_seconds`,
           tokensIn: sql`${callCost.tokensIn} + excluded.tokens_in`,
           tokensOut: sql`${callCost.tokensOut} + excluded.tokens_out`,
-          totalPaise: sql`${callCost.telephonyPaise} + ${callCost.sttPaise} + ${callCost.ttsPaise}
-            + ${callCost.llmPaise} + excluded.llm_paise + ${callCost.smsPaise} + excluded.sms_paise`,
+          totalPaise: sql`${callCost.telephonyPaise} + ${callCost.ttsPaise}
+            + ${callCost.sttPaise} + excluded.stt_paise
+            + ${callCost.llmPaise} + excluded.llm_paise
+            + ${callCost.smsPaise} + excluded.sms_paise`,
         },
       })
       .returning(),
