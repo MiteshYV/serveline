@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { stt } from '@/adapters/stt/index.ts'
 import { getSession } from '@/auth/session.ts'
 import { hasValidConsent } from '@/core/consent.ts'
 import { getConsent, getCustomer } from '@/db/repos/index.ts'
@@ -27,6 +28,29 @@ const GATE: Record<'signIn' | 'consent', Record<Lang, string>> = {
     hi: 'पहले चेकआउट पर सूचना से सहमति दें, फिर कॉल करने के लिए यहाँ वापस आएँ।',
     kn: 'ಮೊದಲು ಚೆಕ್‌ಔಟ್‌ನಲ್ಲಿ ಸೂಚನೆಗೆ ಒಪ್ಪಿಗೆ ನೀಡಿ, ನಂತರ ಕರೆ ಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.',
   },
+}
+
+/**
+ * Whether `/listen` will answer with the mock recogniser, asked of the adapter itself rather than
+ * read off VENDOR_MODE, so the two cannot drift: `STT_PROVIDER` overrides the mode, and only the
+ * selection in src/adapters/stt/index.ts knows the answer. It is server-side — `vendorMode()` and
+ * the provider clients read `process.env` — so the answer travels to CallClient as a boolean and
+ * no server module is imported into a client component.
+ *
+ * It matters to the browser because a mock recogniser has bytes and no way to know what is on
+ * them: under the mock the page must hand over the words its own `SpeechRecognition` heard, and
+ * the route accepts that field from nobody else.
+ *
+ * `stt()` throws where a live mode names no provider. That is the listen route's problem to
+ * report, not this page's — a caller who can still type should not be shown a crash — so the
+ * throw is read here as "not the mock", which is true.
+ */
+function usesMockStt(): boolean {
+  try {
+    return stt().provider === 'mock'
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -64,5 +88,5 @@ export default async function CallPage({ params }: Props) {
     )
   }
 
-  return <CallClient slug={slug} restaurant={restaurant.name} lang={lang} />
+  return <CallClient slug={slug} restaurant={restaurant.name} lang={lang} mockStt={usesMockStt()} />
 }

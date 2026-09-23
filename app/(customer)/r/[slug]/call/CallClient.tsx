@@ -11,16 +11,42 @@ import type { TurnResult } from '@/voice/loop.ts'
 import styles from './call.module.css'
 
 /**
- * The browser transport of the call assistant (M2 design "Surfaces", ADR 0004): the page's
- * `SpeechRecognition` in the page's language, the reply spoken with `speechSynthesis` in the
- * same language and shown as a transcript. Feature-detected: no recogniser, or no microphone
- * permission, and the field below is the only input — it is there in every state regardless.
+ * The browser transport of the call assistant (M2 design "Surfaces", ADR 0004): the reply spoken
+ * with `speechSynthesis` in the caller's language and shown as a transcript. Feature-detected at
+ * every level — the field below is the only input that is always there, in every state.
  *
- * One component, no dependency, no webfont: the ordering page's budget (Build Spec §6) applies
- * to this route too.
+ * There are two ways this page turns a voice into words, and it picks the better one it can run:
+ *
+ *  - **clip** — `MediaRecorder` records what the caller said and posts it to `/listen`, which
+ *    hands it to whichever recogniser `STT_PROVIDER` selected (ADR 0007: `whisper.cpp` on the
+ *    restaurant's own machine). The audio goes to the restaurant, not to Google, and the same
+ *    route is what the Exotel transport will post a telephone clip to.
+ *  - **browser** — the page's own `SpeechRecognition`, which is what this file did before
+ *    `/listen` existed. Chrome only, a held device only, and the audio goes to Google whatever
+ *    Build Spec §10 says. Kept because it is still better than nothing when the clip path cannot
+ *    run here, and because under the mock it is the only thing that knows what was said.
+ *
+ * Under the mock there is no recogniser at all, so the clip path runs *with* the browser one
+ * beside it: the recogniser supplies the words in `mockTranscript` and everything else on the
+ * route — the ledger, the confidence gate, the turn — runs for real with no server to start. It
+ * is never started beside a live recogniser; that would put the audio back on the wire that
+ * ADR 0007 took it off.
+ *
+ * One component, no dependency, no polyfill, no webfont: MediaRecorder and getUserMedia are
+ * platform APIs, so the ordering page's budget (ADR 0003, which covers this route) is untouched.
  */
 
-type Props = { slug: string; restaurant: string; lang: Lang }
+type Props = {
+  slug: string
+  restaurant: string
+  lang: Lang
+  /**
+   * Whether `/listen` will answer with the mock recogniser — decided server-side in page.tsx,
+   * because `stt()` reads the environment and a client component cannot. True means this page
+   * must hand over the words its own recogniser heard, since a mock cannot invent them.
+   */
+  mockStt: boolean
+}
 
 /** What the recogniser and the voices are asked for (M2 design "Surfaces": hi-IN, en-IN, kn-IN). */
 const BCP47: Record<Lang, string> = { hi: 'hi-IN', en: 'en-IN', kn: 'kn-IN' }
@@ -39,7 +65,44 @@ const FILLER_AFTER_MS = 1_200
 const PROMPT_AFTER_EMPTY = 2
 const LAST_AUTO_LISTEN = 3
 
+/**
+ * A clip is a caller's sentence. The route refuses 8 MB, which a browser needs minutes to reach,
+ * so this is not about the limit: it is the backstop for a recording nobody stopped — a tab left
+ * open, or a mock run where the recogniser never reported an end. The caller's own tap is the
+ * normal way a clip ends.
+ */
+const MAX_CLIP_MS = 15_000
+
+/**
+ * After asking the recogniser beside the recorder to stop, how long its last result is waited
+ * for before the clip is ended anyway. A backstop for one that never answers; in practice
+ * `onend` arrives well inside it and ends the clip itself.
+ */
+const RECOGNISER_FLUSH_MS = 1_000
+
+/**
+ * Consecutive clip failures before the page stops trying. One is a bad moment; two in a row is a
+ * recogniser that is not there (ADR 0007's whisper server is a process someone has to have
+ * started), and asking the caller to keep talking into it is worse than saying so.
+ */
+const CLIP_FAILURES_BEFORE_FALLBACK = 2
+
+/** In the route's accepted list, commonest first. Chrome records webm/opus, Safari mp4/aac. */
+const CLIP_TYPES = ['audio/webm', 'audio/mp4', 'audio/ogg']
+
 const JSON_HEADERS = { 'content-type': 'application/json' }
+
+/**
+ * What this browser can record, or undefined to let it choose — the route accepts either, and a
+ * type it does not accept comes back 415, which is handled.
+ */
+function clipType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return undefined
+  return CLIP_TYPES.find((type) => MediaRecorder.isTypeSupported(type))
+}
+
+const canRecord = (): boolean =>
+  typeof MediaRecorder !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function'
 
 /**
  * The Web Speech recogniser: TS 5.9's DOM lib types its result lists but not the object, and
@@ -54,6 +117,9 @@ type Recogniser = {
   onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
   start(): void
+  /** Ends the run and delivers what it has heard so far, then `onend`. */
+  stop(): void
+  /** Ends the run and throws it away — no result, then `onend`. */
   abort(): void
 }
 type RecogniserCtor = new () => Recogniser
@@ -77,18 +143,23 @@ type Strings = {
   limit: string
   connecting: string
   listening: string
+  recording: string
   thinking: string
   speaking: string
   tapToSpeak: string
+  tapToStop: string
   typeInstead: string
   send: string
   endCall: string
   areYouThere: string
   noVoice: string
   micDenied: string
+  noMic: string
   noRecognition: string
   startFailed: string
   sendFailed: string
+  listenFailed: string
+  clipTooLong: string
   ended: string
   orderPlaced: string
   handedOff: string
@@ -108,18 +179,23 @@ const STRINGS: Record<Lang, Strings> = {
     limit: 'Voices depend on your device; a Kannada voice is often missing. Typing always works.',
     connecting: 'Connecting…',
     listening: 'Listening…',
+    recording: 'Recording…',
     thinking: 'One moment…',
     speaking: 'Speaking…',
     tapToSpeak: 'Tap to speak',
+    tapToStop: 'Tap when you have finished',
     typeInstead: 'Type instead',
     send: 'Send',
     endCall: 'End call',
     areYouThere: 'Are you there?',
     noVoice: 'No {language} voice on this device — text still works',
     micDenied: 'Microphone not allowed — text still works',
+    noMic: 'No microphone on this device — text still works',
     noRecognition: 'This browser cannot listen — type instead',
     startFailed: 'Could not start the call. Try again.',
     sendFailed: 'That did not reach the restaurant. Try again.',
+    listenFailed: 'That could not be heard. Try again, or type it below.',
+    clipTooLong: 'That was too long to hear. Say it in a shorter sentence, or type it below.',
     ended: 'Call ended',
     orderPlaced: 'Your order is placed.',
     handedOff: 'The restaurant will take it from here.',
@@ -133,18 +209,23 @@ const STRINGS: Record<Lang, Strings> = {
     limit: 'आवाज़ें आपके डिवाइस पर निर्भर हैं; कन्नड़ आवाज़ अक्सर नहीं होती। टाइप करना हमेशा काम करता है।',
     connecting: 'जोड़ रहे हैं…',
     listening: 'सुन रहे हैं…',
+    recording: 'रिकॉर्ड हो रहा है…',
     thinking: 'एक सेकंड…',
     speaking: 'बोल रहे हैं…',
     tapToSpeak: 'बोलने के लिए टैप करें',
+    tapToStop: 'बोलना पूरा होने पर टैप करें',
     typeInstead: 'इसके बजाय टाइप करें',
     send: 'भेजें',
     endCall: 'कॉल समाप्त करें',
     areYouThere: 'क्या आप वहाँ हैं?',
     noVoice: 'इस डिवाइस पर {language} आवाज़ नहीं है — टेक्स्ट फिर भी काम करता है',
     micDenied: 'माइक्रोफ़ोन की अनुमति नहीं है — टेक्स्ट फिर भी काम करता है',
+    noMic: 'इस डिवाइस पर माइक्रोफ़ोन नहीं है — टेक्स्ट फिर भी काम करता है',
     noRecognition: 'यह ब्राउज़र सुन नहीं सकता — टाइप करें',
     startFailed: 'कॉल शुरू नहीं हो सकी। फिर कोशिश करें।',
     sendFailed: 'यह रेस्टोरेंट तक नहीं पहुँचा। फिर कोशिश करें।',
+    listenFailed: 'यह सुना नहीं जा सका। फिर कोशिश करें, या नीचे टाइप करें।',
+    clipTooLong: 'यह सुनने के लिए बहुत लंबा था। छोटे वाक्य में कहें, या नीचे टाइप करें।',
     ended: 'कॉल समाप्त',
     orderPlaced: 'आपका ऑर्डर हो गया है।',
     handedOff: 'अब रेस्टोरेंट आगे संभालेगा।',
@@ -158,18 +239,23 @@ const STRINGS: Record<Lang, Strings> = {
     limit: 'ಧ್ವನಿಗಳು ನಿಮ್ಮ ಸಾಧನವನ್ನು ಅವಲಂಬಿಸಿವೆ; ಕನ್ನಡ ಧ್ವನಿ ಹೆಚ್ಚಾಗಿ ಇರುವುದಿಲ್ಲ. ಟೈಪ್ ಮಾಡುವುದು ಯಾವಾಗಲೂ ಕೆಲಸ ಮಾಡುತ್ತದೆ.',
     connecting: 'ಸಂಪರ್ಕಿಸಲಾಗುತ್ತಿದೆ…',
     listening: 'ಕೇಳುತ್ತಿದ್ದೇವೆ…',
+    recording: 'ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ…',
     thinking: 'ಒಂದು ಕ್ಷಣ…',
     speaking: 'ಮಾತನಾಡುತ್ತಿದ್ದೇವೆ…',
     tapToSpeak: 'ಮಾತನಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ',
+    tapToStop: 'ಮಾತು ಮುಗಿದ ಮೇಲೆ ಟ್ಯಾಪ್ ಮಾಡಿ',
     typeInstead: 'ಬದಲಿಗೆ ಟೈಪ್ ಮಾಡಿ',
     send: 'ಕಳುಹಿಸಿ',
     endCall: 'ಕರೆ ಮುಗಿಸಿ',
     areYouThere: 'ನೀವು ಇದ್ದೀರಾ?',
     noVoice: 'ಈ ಸಾಧನದಲ್ಲಿ {language} ಧ್ವನಿ ಇಲ್ಲ — ಪಠ್ಯ ಇನ್ನೂ ಕೆಲಸ ಮಾಡುತ್ತದೆ',
     micDenied: 'ಮೈಕ್ರೊಫೋನ್‌ಗೆ ಅನುಮತಿ ಇಲ್ಲ — ಪಠ್ಯ ಇನ್ನೂ ಕೆಲಸ ಮಾಡುತ್ತದೆ',
+    noMic: 'ಈ ಸಾಧನದಲ್ಲಿ ಮೈಕ್ರೊಫೋನ್ ಇಲ್ಲ — ಪಠ್ಯ ಇನ್ನೂ ಕೆಲಸ ಮಾಡುತ್ತದೆ',
     noRecognition: 'ಈ ಬ್ರೌಸರ್ ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ — ಟೈಪ್ ಮಾಡಿ',
     startFailed: 'ಕರೆ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
     sendFailed: 'ಇದು ರೆಸ್ಟೋರೆಂಟ್ ತಲುಪಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    listenFailed: 'ಅದು ಕೇಳಿಸಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ, ಅಥವಾ ಕೆಳಗೆ ಟೈಪ್ ಮಾಡಿ.',
+    clipTooLong: 'ಅದು ಕೇಳಲು ತುಂಬಾ ಉದ್ದವಾಗಿತ್ತು. ಚಿಕ್ಕ ವಾಕ್ಯದಲ್ಲಿ ಹೇಳಿ, ಅಥವಾ ಕೆಳಗೆ ಟೈಪ್ ಮಾಡಿ.',
     ended: 'ಕರೆ ಮುಗಿದಿದೆ',
     orderPlaced: 'ನಿಮ್ಮ ಆರ್ಡರ್ ಆಗಿದೆ.',
     handedOff: 'ಇನ್ನು ರೆಸ್ಟೋರೆಂಟ್ ಮುಂದುವರಿಸುತ್ತದೆ.',
@@ -182,16 +268,20 @@ const STRINGS: Record<Lang, Strings> = {
 
 type Line = { id: number; speaker: 'customer' | 'ai'; text: string; lang: Lang }
 type Phase = 'idle' | 'connecting' | 'live' | 'ended'
-type Activity = 'listening' | 'thinking' | 'speaking' | null
+type Activity = 'listening' | 'recording' | 'thinking' | 'speaking' | null
 type Ended = { outcome?: TurnResult['outcome']; orderId?: string }
+/** Which of the two paths in this file's header is turning the caller's voice into words. */
+type Ear = 'clip' | 'browser'
+/** What the browser's own recogniser heard, when it was running. */
+type Heard = { text: string; confidence: number | undefined }
 
-export function CallClient({ slug, restaurant, lang }: Props) {
+export function CallClient({ slug, restaurant, lang, mockStt }: Props) {
   const s = STRINGS[lang]
   const [phase, setPhase] = useState<Phase>('idle')
   const [activity, setActivity] = useState<Activity>(null)
   const [lines, setLines] = useState<Line[]>([])
   const [note, setNote] = useState<string | null>(null)
-  const [error, setError] = useState<'start' | 'send' | null>(null)
+  const [error, setError] = useState<'start' | 'send' | 'listen' | 'tooLong' | null>(null)
   const [ended, setEnded] = useState<Ended>({})
   const [text, setText] = useState('')
   const [canListen, setCanListen] = useState(false)
@@ -208,10 +298,33 @@ export function CallClient({ slug, restaurant, lang }: Props) {
   const nextId = useRef(1)
   const list = useRef<HTMLOListElement>(null)
 
+  /**
+   * A ref, not state: every caller of `listen()` is inside a `speak()` continuation or a timer,
+   * and a state value captured there is the one from the render that scheduled it. `canListen`
+   * is the same fact for rendering only, which is how `micOk` already works.
+   */
+  const ear = useRef<Ear | null>(null)
+  /** Held for the length of the call so a second clip does not re-prompt; released by `finish`. */
+  const stream = useRef<MediaStream | null>(null)
+  const recorder = useRef<MediaRecorder | null>(null)
+  const chunks = useRef<Blob[]>([])
+  /** The words the browser recogniser heard beside the current clip, under the mock. */
+  const heard = useRef<Heard | null>(null)
+  const clipTimer = useRef<number | null>(null)
+  const clipFails = useRef(0)
+  /** True between asking for the microphone and having a recorder, which is a tappable window. */
+  const arming = useRef(false)
+
   useEffect(() => {
     // Feature detection after mount: the server rendered the text-only page and hydration must
     // match it. The voice list arrives asynchronously in Chrome, hence the listener.
-    if (recogniserCtor()) setCanListen(true)
+    //
+    // The clip path is preferred wherever it can run. Under the mock it needs the browser
+    // recogniser beside it for the words, so without one it is no better than silence and the
+    // browser path is chosen instead — which, without a recogniser either, is no path at all.
+    const hasRecogniser = recogniserCtor() !== null
+    ear.current = canRecord() && (!mockStt || hasRecogniser) ? 'clip' : hasRecogniser ? 'browser' : null
+    if (ear.current) setCanListen(true)
     else setNote(STRINGS[lang].noRecognition)
     const sy = synth()
     const load = () => {
@@ -233,10 +346,22 @@ export function CallClient({ slug, restaurant, lang }: Props) {
       sy?.removeEventListener('voiceschanged', load)
       window.removeEventListener('pagehide', bye)
       recogniser.current?.abort()
+      // Detached first: an unmounted page must not go on to post the clip it was holding. The
+      // tracks are stopped explicitly or the browser's recording indicator stays lit.
+      const rec = recorder.current
+      if (rec) {
+        rec.ondataavailable = null
+        rec.onstop = null
+        if (rec.state !== 'inactive') rec.stop()
+        recorder.current = null
+      }
+      stream.current?.getTracks().forEach((track) => track.stop())
+      stream.current = null
       if (silenceTimer.current !== null) clearTimeout(silenceTimer.current)
+      if (clipTimer.current !== null) clearTimeout(clipTimer.current)
       sy?.cancel()
     }
-  }, [lang])
+  }, [lang, mockStt])
 
   useEffect(() => {
     const el = list.current
@@ -252,8 +377,12 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     silenceTimer.current = null
   }
 
-  /** Detaches before aborting, so the run's onend never counts as a silence. */
+  /**
+   * Detaches before aborting, so the run's onend never counts as a silence, and throws away a
+   * clip in flight — whoever stopped the page listening has already decided what comes instead.
+   */
   function stopListening() {
+    cancelRecording()
     const r = recogniser.current
     if (!r) return
     r.onend = null
@@ -261,6 +390,22 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     r.abort()
     recogniser.current = null
     setActivity((a) => (a === 'listening' ? null : a))
+  }
+
+  /** Gives the microphone back. The browser's recording indicator is a promise to the caller. */
+  function releaseMic() {
+    stream.current?.getTracks().forEach((track) => track.stop())
+    stream.current = null
+  }
+
+  /**
+   * The clip path cannot run here. Falls back to the browser's own recogniser if there is one —
+   * worse on every count ADR 0007 lists, and still better than a caller mid-order with no voice
+   * at all — and otherwise to the field below, which has never stopped working.
+   */
+  function fallBack() {
+    ear.current = recogniserCtor() ? 'browser' : null
+    setCanListen(ear.current !== null)
   }
 
   /**
@@ -306,8 +451,293 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     sy.speak(u)
   }
 
-  /** Barge-in (design "Surfaces": speaking stops the voice): starting to listen cancels speech. */
+  /**
+   * Barge-in (design "Surfaces": speaking stops the voice): starting to listen cancels speech.
+   * Which way it listens is `ear` — see this file's header for the two.
+   */
   function listen() {
+    if (ear.current === 'clip') void record()
+    else if (ear.current === 'browser') listenBrowser()
+  }
+
+  /** There is no microphone to be had; the field below is the whole of the call from here. */
+  function micUnavailable(why: 'denied' | 'missing') {
+    micOk.current = false
+    ear.current = null
+    setCanListen(false)
+    setNote(why === 'denied' ? STRINGS[lang].micDenied : STRINGS[lang].noMic)
+  }
+
+  /**
+   * The clip path: record what the caller says, post it to `/listen`, and send the words it
+   * answers with to `/turn` exactly as a typed message goes. The microphone is asked for once
+   * and held for the call, so the second clip of a conversation does not re-prompt.
+   */
+  async function record() {
+    // `arming` covers the await below: the permission prompt can be on screen for as long as the
+    // caller looks at it, and a second tap in that window would start a second recorder.
+    if (!callId.current || !micOk.current || recorder.current || arming.current) return
+    arming.current = true
+    try {
+      hush()
+      // A new clip is the answer to whatever the last band said; it goes when the caller retries,
+      // not when the reply to it eventually lands.
+      setError(null)
+      heard.current = null
+      chunks.current = []
+
+      if (!stream.current) {
+        try {
+          stream.current = await navigator.mediaDevices.getUserMedia({ audio: true })
+        } catch (denial) {
+          // A refusal, or a device that is not there. Either way the browser's own recogniser
+          // would ask for the same microphone and be told the same thing, so there is nothing to
+          // fall back to but the field.
+          const name = (denial as { name?: string } | null)?.name
+          micUnavailable(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'missing')
+          setActivity(null)
+          return
+        }
+        // The caller hung up while the permission prompt was on screen.
+        if (!callId.current) {
+          releaseMic()
+          return
+        }
+      }
+
+      let rec: MediaRecorder
+      const type = clipType()
+      try {
+        rec = new MediaRecorder(stream.current, type ? { mimeType: type } : {})
+      } catch {
+        // MediaRecorder exists but will not record this stream. It will not next time either.
+        fallBack()
+        listen()
+        return
+      }
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.current.push(e.data)
+      }
+      rec.onstop = () => {
+        if (clipTimer.current !== null) {
+          clearTimeout(clipTimer.current)
+          clipTimer.current = null
+        }
+        recorder.current = null
+        const parts = chunks.current
+        chunks.current = []
+        setActivity((a) => (a === 'recording' ? null : a))
+        if (!callId.current) return
+        // `rec.mimeType` is what the browser actually recorded, codec parameters and all; the
+        // route compares the media type alone. Nothing recorded is a tab that could not capture,
+        // not silence — posting it would bill the ledger for a clip that never existed.
+        const clip = new Blob(parts, { type: rec.mimeType || 'audio/webm' })
+        if (clip.size === 0) {
+          onSilence()
+          return
+        }
+        void transcribe(clip, heard.current)
+      }
+      recorder.current = rec
+      try {
+        rec.start()
+      } catch {
+        recorder.current = null
+        fallBack()
+        listen()
+        return
+      }
+      setActivity('recording')
+      clipTimer.current = window.setTimeout(endClip, MAX_CLIP_MS)
+      if (mockStt) listenAlongside()
+    } finally {
+      arming.current = false
+    }
+  }
+
+  /**
+   * Ends the clip the way the caller means it. Where the browser's recogniser is running beside
+   * the recorder, it is asked to `stop()` — not `abort()` — so it delivers the words it has
+   * before ending, because under the mock those words are the only ones there will ever be; its
+   * `onend` then stops the recorder. The timer is the backstop for a recogniser that does not
+   * answer, and `onstop` clears it.
+   */
+  function endClip() {
+    const r = recogniser.current
+    if (!r) {
+      stopRecording()
+      return
+    }
+    if (clipTimer.current !== null) clearTimeout(clipTimer.current)
+    clipTimer.current = window.setTimeout(stopRecording, RECOGNISER_FLUSH_MS)
+    try {
+      r.stop()
+    } catch {
+      stopRecording()
+    }
+  }
+
+  /**
+   * Mock only. The mock adapter has bytes and no way to know what is on them, so the browser's
+   * recogniser runs beside the recorder and supplies the words (`SttRequest.mockTranscript`);
+   * the route, the ledger, the confidence gate and the turn then run for real with no whisper
+   * server anywhere. Its `onend` is also free endpoint detection, so the caller does not have to
+   * tap twice. Never started against a live recogniser — that would put the audio back on the
+   * wire ADR 0007 took it off.
+   */
+  function listenAlongside() {
+    const Ctor = recogniserCtor()
+    if (!Ctor || recogniser.current) return
+    const r = new Ctor()
+    r.lang = BCP47[lang]
+    r.continuous = false
+    r.interimResults = false
+    r.maxAlternatives = 1
+    r.onresult = (e) => {
+      const alt = e.results[0]?.[0]
+      const said = alt?.transcript.trim()
+      if (!alt || !said) return
+      // WebKit reports 0 for every result; only a real reading is worth handing on, and the mock
+      // supplies its own 0.95 when none is given rather than reading a zero as low confidence.
+      heard.current = { text: said, confidence: alt.confidence > 0 ? alt.confidence : undefined }
+    }
+    r.onerror = (e) => {
+      if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed') return
+      // getUserMedia was allowed and this was not: a clip is being recorded that nothing can
+      // read. Throw it away rather than post a clip the mock will answer with silence.
+      cancelRecording()
+      micUnavailable('denied')
+    }
+    r.onend = () => {
+      recogniser.current = null
+      stopRecording()
+    }
+    recogniser.current = r
+    try {
+      r.start()
+    } catch {
+      recogniser.current = null
+    }
+  }
+
+  /** Ends the clip and lets `onstop` post it. */
+  function stopRecording() {
+    const rec = recorder.current
+    if (!rec) return
+    if (rec.state !== 'inactive') {
+      rec.stop()
+      return
+    }
+    recorder.current = null
+    setActivity((a) => (a === 'recording' ? null : a))
+  }
+
+  /** Ends the clip and throws it away: the caller is doing something else now. */
+  function cancelRecording() {
+    const rec = recorder.current
+    if (!rec) return
+    rec.ondataavailable = null
+    rec.onstop = null
+    recorder.current = null
+    chunks.current = []
+    if (clipTimer.current !== null) {
+      clearTimeout(clipTimer.current)
+      clipTimer.current = null
+    }
+    if (rec.state !== 'inactive') rec.stop()
+    setActivity((a) => (a === 'recording' ? null : a))
+  }
+
+  /**
+   * POST /listen — the clip in, the words out. Deliberately not fused with `/turn`: transcribing
+   * and answering are separate failures, and a clip nobody could hear should be said again, not
+   * answered (the route's own note says the same).
+   */
+  async function transcribe(clip: Blob, alongside: Heard | null) {
+    const id = callId.current
+    if (!id) return
+    setActivity('thinking')
+
+    const form = new FormData()
+    form.append('audio', clip, 'clip')
+    form.append('lang', lang)
+    // Only under the mock. The route refuses this field against any other adapter, so it can
+    // never become a way to put words in a caller's mouth (src/adapters/stt/index.ts).
+    if (mockStt && alongside) {
+      form.append('mockTranscript', alongside.text)
+      if (alongside.confidence !== undefined) form.append('mockConfidence', String(alongside.confidence))
+    }
+
+    let res: Response
+    try {
+      res = await fetch(`/api/v1/voice/calls/${id}/listen`, { method: 'POST', body: form })
+    } catch {
+      clipFailed(id, alongside, 'listen', true)
+      return
+    }
+    // The caller hung up while the clip was in flight: what was on it is nobody's now.
+    if (callId.current !== id) return
+    if (res.status === 409) {
+      finish({})
+      return
+    }
+    // The clip, not the path: a shorter one will go through, so nothing is given up.
+    if (res.status === 413) {
+      clipFailed(id, alongside, 'tooLong', false)
+      return
+    }
+    // 415 is what this browser records; 400 is the shape of what was sent. Both will be the same
+    // next time, so this counts as final however few clips have failed.
+    if (res.status === 415 || res.status === 400) {
+      fallBack()
+      clipFailed(id, alongside, 'listen', false)
+      return
+    }
+    if (!res.ok) {
+      // 502 is the recogniser: no whisper server, or one that answered with an error — ADR 0007
+      // runs it as a process someone has to have started. 500 and 401 are ours, no more retryable.
+      clipFailed(id, alongside, 'listen', true)
+      return
+    }
+
+    const said = (await res.json()) as { text: string; confidence: number | null; seconds: number }
+    if (callId.current !== id) return
+    clipFails.current = 0
+    const words = said.text.trim()
+    // Silence is a 200 with no words, not an error. Same treatment as an empty recogniser run:
+    // listen again, ask once, then let the timer decide.
+    if (!words) {
+      setActivity(null)
+      onSilence()
+      return
+    }
+    // `confidence` is null where the provider does not report one. Build Spec §5.3 gates on 0.6
+    // and "unknown" is not "low", so a null is sent as nothing at all, never as a number.
+    void send(words, { confidence: said.confidence ?? undefined, typed: false })
+  }
+
+  /**
+   * A clip did not come back as words. Where the browser's own recogniser was running beside it
+   * — under the mock, always — those are the same words by a worse route, so they go to `/turn`
+   * and the caller loses nothing. Where it was not, the caller is told, and the field below is
+   * still there, as it has been in every state on this page.
+   */
+  function clipFailed(id: string, alongside: Heard | null, why: 'listen' | 'tooLong', repeatable: boolean) {
+    if (callId.current !== id) return
+    if (repeatable) {
+      clipFails.current += 1
+      if (clipFails.current >= CLIP_FAILURES_BEFORE_FALLBACK) fallBack()
+    }
+    if (alongside && alongside.text) {
+      void send(alongside.text, { confidence: alongside.confidence, typed: false })
+      return
+    }
+    setActivity(null)
+    setError(why)
+  }
+
+  /** The browser's own recogniser: Chrome only, and the audio goes to Google (this file's header). */
+  function listenBrowser() {
     const Ctor = recogniserCtor()
     if (!Ctor || !micOk.current || !callId.current || recogniser.current) return
     hush()
@@ -327,11 +757,7 @@ export function CallClient({ slug, restaurant, lang }: Props) {
       void send(said, { confidence: alt.confidence > 0 ? alt.confidence : undefined, typed: false })
     }
     r.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        micOk.current = false
-        setCanListen(false)
-        setNote(STRINGS[lang].micDenied)
-      }
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') micUnavailable('denied')
       // 'no-speech' and the rest are followed by onend, which decides what happens next.
     }
     r.onend = () => {
@@ -393,6 +819,7 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     const init = (await res.json()) as { callId: string; greeting: string; lang: Lang }
     callId.current = init.callId
     emptyRuns.current = 0
+    clipFails.current = 0
     setPhase('live')
     // The greeting may be in the caller's preferred language rather than the page's (Build Spec
     // §5.2); it is shown and spoken in the language it was written in.
@@ -476,6 +903,10 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     callId.current = null
     stopListening()
     clearSilence()
+    // The microphone was held for the length of the call and no longer; the recording indicator
+    // goes out at the same moment the call does.
+    releaseMic()
+    clipFails.current = 0
     setEnded(e)
     setPhase('ended')
     setActivity(null)
@@ -507,6 +938,21 @@ export function CallClient({ slug, restaurant, lang }: Props) {
     clearSilence()
     emptyRuns.current = 0
   }
+
+  /**
+   * The one microphone button. While a clip is recording it is the stop — which is the whole of
+   * the endpoint detection wherever no recogniser is running beside the recorder to find the end
+   * of a sentence, and a labelled button rather than a gesture is what design §6.2 asks for.
+   */
+  function onMic() {
+    if (recorder.current) endClip()
+    else listen()
+  }
+
+  // One band, the existing one (design §7.10.1): the page has two live regions and a review has
+  // already found that too many. Nothing here announces itself that the activity line cannot.
+  const liveError =
+    error === 'send' ? s.sendFailed : error === 'listen' ? s.listenFailed : error === 'tooLong' ? s.clipTooLong : null
 
   const outcomeLine = ended.orderId
     ? s.orderPlaced
@@ -549,12 +995,15 @@ export function CallClient({ slug, restaurant, lang }: Props) {
 
       {phase === 'live' && (
         <div className={styles.controls}>
+          {/* The one place a state on this page is announced: "Recording…" reaches a screen
+              reader here, not by a second region competing with it. */}
           <p className={styles.activity} role="status">{activity ? s[activity] : ''}</p>
-          {error === 'send' && <Band tone="attention">{s.sendFailed}</Band>}
+          {liveError && <Band tone="attention">{liveError}</Band>}
           {canListen && (
-            // Tapping while the reply is still being spoken is the barge-in.
-            <Button variant="brand" size="counter" block onClick={listen} disabled={activity === 'thinking'}>
-              {activity === 'listening' ? s.listening : s.tapToSpeak}
+            // Tapping while the reply is still being spoken is the barge-in; tapping while a clip
+            // is recording ends it. The label carries the state in words, never the colour alone.
+            <Button variant="brand" size="counter" block onClick={onMic} disabled={activity === 'thinking'}>
+              {activity === 'recording' ? s.tapToStop : activity === 'listening' ? s.listening : s.tapToSpeak}
             </Button>
           )}
           <form onSubmit={submit} className={styles.typeRow}>
