@@ -17,11 +17,32 @@ ServeLine takes the relationship from order two onward.
 
 ## Current state
 
-Milestone M1: ordering page and restaurant dashboard, no AI yet.
+**M1 and M2 are complete and browser-verified.** The ordering page, the counter dashboard and the
+agent console all work; so does the call assistant — fourteen tools, three languages, guardrails,
+a per-call cost ledger, and a review screen that shows every tool call it made and what each one
+returned.
 
-Built in portfolio-first mode — every external vendor (payments, SMS, telephony, speech, LLM) sits
-behind an adapter interface with a mock implementation. No vendor account is needed to run the
-product end to end. Swapping in live credentials is a configuration change, not a rewrite.
+Built in portfolio-first mode: every external vendor — payments, SMS, telephony, speech, LLM —
+sits behind an adapter interface with a working mock. **No vendor account is needed to run any of
+it end to end.** Swapping in live credentials is a configuration change, not a rewrite.
+
+What is measured, and how:
+
+| | |
+|---|---|
+| Item accuracy, 90 scripted utterances | 100% in English, Hindi and Kannada (`contracts/voice-eval/`) |
+| Ordering page | Lighthouse mobile 99, against a floor of 85 (ADR 0003) |
+| Tests | 377, `node:test`, no framework |
+
+Read those numbers with the caveat the eval README states plainly: **it is text in, text out.** The
+assistant reasons correctly about Kannada text; it has not yet been measured hearing Kannada down a
+phone line with a kitchen behind it, which is the number that decides a pilot.
+
+What is **not** built, stated here so the gap is not something you discover later: there is no
+telephony leg and no text-to-speech adapter, so a real phone call does not work end to end yet —
+the browser is the only transport. Menu digitisation (M4), the billing job and the metrics views
+(M5) are unstarted. `docs/adr/` records every decision that took the repository away from the Build
+Spec, including the ones that were wrong.
 
 ## Getting started
 
@@ -42,13 +63,22 @@ app/          Next.js routes — the three surfaces and the API
   (customer)/   ordering page, /r/{slug}
   (restaurant)/ counter dashboard, /app
   (platform)/   internal agent console, /agent
-  api/v1/       the API, shared by all three and by the voice service at M2
+  api/v1/       the API, shared by all three and by the voice transports
 src/
   core/       domain logic with no framework imports — cart, order state, codes, consent
   db/         Drizzle schema, migrations, seed
-  adapters/   payments, sms, storage, llm — one interface and one mock each
+  adapters/   payments, sms, storage, llm, stt — one interface and one mock each
   auth/       phone OTP and session cookies
-  ui/         design tokens and shared components
-contracts/    language-neutral files the Python voice service will also read at M2
-docs/         ADRs, runbooks, design specs
+  voice/      the call assistant: prompt, loop, tools, guardrails, cost ledger
+  ui/         design tokens, shared components, and ShadCN primitives on a token bridge
+contracts/    language-neutral files the Python voice service will also read
+docs/         ADRs, reviews, design specs
+graphify-out/ a knowledge graph of the whole repository — open graph.html
 ```
+
+## Worth reading first
+
+- `docs/design/steel-and-enamel.md` — the design language, and the reasoning behind each rule
+- `docs/adr/0009-speech-to-text-adapter.md` — why speech runs on the restaurant's own machine
+- `docs/reviews/2026-09-22-bug-hunt.md` — 24 confirmed defects with evidence, and 3 refuted
+- `contracts/voice-eval/README.md` — what the accuracy numbers mean and what they do not
