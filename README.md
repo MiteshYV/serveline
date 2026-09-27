@@ -6,6 +6,13 @@ A restaurant keeps its existing phone number, forwards it to an AI that takes or
 and Kannada, and owns the resulting customer database outright. The aggregators acquire the customer;
 ServeLine takes the relationship from order two onward.
 
+## How it was built
+
+I designed and directed this; Claude Code wrote the code, and I do not claim it as mine. What I
+claim is the product: the Ideation file decided what to build, the Build Spec decided how, and
+`docs/adr/` records every place the build departed from either and why. Nine days, 18 to 27
+September 2026.
+
 ## The documents
 
 | File | What it is |
@@ -84,7 +91,15 @@ graphify-out/ a knowledge graph of the whole repository — open graph.html
 
 ## Worth reading first
 
-- `docs/design/steel-and-enamel.md` — the design language, and the reasoning behind each rule
-- `docs/adr/0009-speech-to-text-adapter.md` — why speech runs on the restaurant's own machine
-- `docs/reviews/2026-09-22-bug-hunt.md` — 24 confirmed defects with evidence, and 3 refuted
-- `contracts/voice-eval/README.md` — what the accuracy numbers mean and what they do not
+If you are reading this as a product manager's portfolio, these four are the decisions:
+
+- `docs/adr/0003-ordering-page-js-budget.md`: a byte budget replaced by the outcome it stood for, after measuring
+- `docs/adr/0005-spoken-consent.md`: the consent gate inverted the product for its primary caller; what changed, and what counsel still has to rule on
+- `docs/adr/0006-gemini-model-choice.md`: the model chosen by latency against a budget, not by the vendor's recommendation
+- `contracts/voice-eval/README.md`: what the accuracy numbers mean and what they do not
+
+If you are reading this to run or extend it:
+
+- `docs/design/steel-and-enamel.md`: the design language, and the reasoning behind each rule
+- `docs/adr/0009-speech-to-text-adapter.md`: why speech runs on the restaurant's own machine
+- `docs/reviews/2026-09-22-bug-hunt.md`: 24 confirmed defects with evidence, and 3 refuted
