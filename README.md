@@ -10,10 +10,16 @@ ServeLine takes the relationship from order two onward.
 
 | File | What it is |
 |---|---|
-| `ServeLine — Ideation.md` | Canonical product thinking. Where the three documents disagree, this one wins. |
-| `ServeLine — Build Spec.md` | How to build what Ideation decided. |
 | `docs/adr/` | Every place this repository deliberately departs from the Build Spec, and why. |
 | `docs/superpowers/specs/` | Design specs, one per milestone, agreed before implementation. |
+| `docs/reviews/` | What each review found, including the findings it refuted. |
+| `docs/design/steel-and-enamel.md` | The design language and the reasoning behind each rule. |
+
+Two documents sit above these and are **not in this repository**: `ServeLine — Ideation.md`, the
+canonical product thinking, and `ServeLine — Build Spec.md`, how to build what Ideation decided.
+They carry pricing, acquisition cost and unit economics, which is not something to publish. The
+code and the ADRs cite them by section throughout — `Build Spec §5.4`, `Ideation §3` — so the
+reasoning is traceable even where the source is not open.
 
 ## Current state
 

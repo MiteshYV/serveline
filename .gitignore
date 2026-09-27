@@ -38,3 +38,10 @@ coverage/
 graphify-out/.graphify_python
 graphify-out/.graphify_root
 graphify-out/cache/
+
+# Product documents — the canonical Ideation and Build Spec. Local only.
+# They carry pricing, CAC, payback and unit economics, which do not belong in a
+# public repository. They remain the source of truth for anyone working on this
+# and live beside the code on disk; they are simply not published.
+ServeLine — Ideation.md
+ServeLine — Build Spec.md

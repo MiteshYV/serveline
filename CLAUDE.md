@@ -5,6 +5,12 @@
 An AI-first ordering platform for Indian SMB restaurants. Read `ServeLine — Ideation.md` first, in
 full, then `ServeLine — Build Spec.md`.
 
+**Those two files are gitignored and are not in the public repository** — they carry pricing, CAC
+and unit economics. They sit beside this file on disk and are still the source of truth. If you
+have cloned this repository and they are absent, you are missing the product context: ask for them
+rather than inferring product behaviour from the code, which records *what* was built and not
+*what was decided*.
+
 **Product decisions live in the Ideation file. If the behaviour you need is not decided there, stop
 and ask.** Do not invent product behaviour. Do not change the fee, the call allowance or the trial
 rules in code without a matching change in the Ideation file.
