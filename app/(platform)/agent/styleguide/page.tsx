@@ -103,7 +103,7 @@ export default async function StyleguidePage() {
   return (
     <main className="mx-auto max-w-[960px] grid gap-[var(--space-48)] px-[var(--space-20)] py-[var(--space-32)]">
       <PageHead
-        title={<>Steel &amp; Enamel</>}
+        title="Astryx · neutral"
         meta="Every component, every state. Sections are wrapped in their native density; the toggle re-renders the whole page from the tokens, which is how both themes get checked."
         actions={
           <ThemeToggle
@@ -250,9 +250,9 @@ export default async function StyleguidePage() {
         </div>
       </Section>
 
-      <Section title="Primitives (ShadCN)" note="ADR 0008 — Radix behaviour, Steel &amp; Enamel palette. Every utility they use resolves to a token through shadcn-bridge.css, so they are correct in both themes with no `dark:` anywhere. Open each one in both themes; that is what this section is for.">
+      <Section title="Astryx components" note="ADR 0010 — Astryx supplies the overlays and controls, on its neutral theme. They own focus trapping, Escape and returning focus to the trigger, and switch with the same data-theme as everything else. Open each one in both themes; that is what this section is for.">
         <div data-density="dense" className="grid gap-[var(--space-16)]">
-          <Row label="Select · Switch + Label">
+          <Row label="Selector · Switch">
             <SelectDemo />
             <SwitchDemo />
           </Row>
@@ -262,11 +262,11 @@ export default async function StyleguidePage() {
             <PopoverDemo />
             <TooltipDemo />
           </Row>
-          <Row label="Dialog (steel plate) · AlertDialog (danger — the only permitted modal, §11.20)">
+          <Row label="Dialog · AlertDialog (danger — the only permitted modal, §11.20)">
             <DialogDemo />
             <AlertDialogDemo />
           </Row>
-          <Row label="Sonner — a confirmation that has nothing to retry; an error with a retry is a Band (§11.15)">
+          <Row label="Toast — a confirmation that has nothing to retry; an error with a retry is a Band (§11.15)">
             <ToastDemo />
           </Row>
         </div>

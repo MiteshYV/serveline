@@ -1,5 +1,10 @@
 # ServeLine Design Language — **Steel & Enamel**
 
+> **Since ADR 0010 (19 November 2026)** the neutral chrome — surfaces, text, borders, the action
+> plate, radius, elevation, focus — comes from the Astryx neutral theme, not from the steel ramp
+> described here. The order-state enamel, FSSAI marks, density, touch targets and motion sections
+> still hold. Read ADR 0010 before relying on a neutral value in this file.
+
 Research / direction document. No application code, no scaffold, no repo.
 Every colour pair in this file was computed, not estimated (WCAG 2.x relative luminance;
 hue/chroma in OKLCH; perceptual distance as ΔE-OK). The verification script is described in

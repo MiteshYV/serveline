@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { toast } from 'sonner'
 import type { OrderStatus } from '@/core/orders.ts'
 import type { Lang } from '@/ui/i18n.ts'
 import { MenuItemRow, type MenuItemView } from '@/ui/MenuItemRow.tsx'
@@ -9,27 +8,18 @@ import { OrderCard, type OrderCardData } from '@/ui/OrderCard.tsx'
 import { QtyStepper } from '@/ui/QtyStepper.tsx'
 import { ResendOtp } from '@/ui/OtpInput.tsx'
 import { Button } from '@/ui/Button.tsx'
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from '@/ui/primitives/alert-dialog.tsx'
-import {
-  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  DialogTrigger,
-} from '@/ui/primitives/dialog.tsx'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/ui/primitives/dropdown-menu.tsx'
-import { Label } from '@/ui/primitives/label.tsx'
-import {
-  Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger,
-} from '@/ui/primitives/popover.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/primitives/select.tsx'
-import { Toaster } from '@/ui/primitives/sonner.tsx'
-import { Switch } from '@/ui/primitives/switch.tsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/primitives/tabs.tsx'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/primitives/tooltip.tsx'
+import { AlertDialog } from '@astryxdesign/core/AlertDialog'
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
+import { HStack } from '@astryxdesign/core/HStack'
+import { Popover } from '@astryxdesign/core/Popover'
+import { Selector } from '@astryxdesign/core/Selector'
+import { Switch } from '@astryxdesign/core/Switch'
+import { Tab, TabList } from '@astryxdesign/core/TabList'
+import { Text } from '@astryxdesign/core/Text'
+import { useToast } from '@astryxdesign/core/Toast'
+import { Tooltip } from '@astryxdesign/core/Tooltip'
+import { VStack } from '@astryxdesign/core/VStack'
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
@@ -93,152 +83,140 @@ export function ResendDemo() {
 
 
 /* ---------------------------------------------------------------------------
-   ShadCN primitives (ADR 0008). They are utility-classed, and every utility they
-   touch resolves to a Steel & Enamel token through shadcn-bridge.css — which is
-   only true until someone writes one that does not, so they are documented here
-   where both themes can be looked at. Imported exactly as they ship; the design
-   system does not get a second copy of them.
+   Astryx components (ADR 0010). They own their keyboard and ARIA behaviour — focus trapping,
+   roving tabindex, Escape, returning focus to the trigger — and draw from the neutral theme in
+   both modes. Shown here so both themes can be looked at side by side.
    --------------------------------------------------------------------------- */
 
 export function SelectDemo() {
+  const [status, setStatus] = useState('received')
   return (
-    <Select defaultValue="received">
-      <SelectTrigger aria-label="Order status">
-        <SelectValue placeholder="Any status" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="received">Received</SelectItem>
-        <SelectItem value="preparing">Preparing</SelectItem>
-        <SelectItem value="ready">Ready</SelectItem>
-        <SelectItem value="delivered">Delivered</SelectItem>
-      </SelectContent>
-    </Select>
+    <Selector
+      label="Order status"
+      isLabelHidden
+      value={status}
+      onChange={setStatus}
+      options={[
+        { value: 'received', label: 'Received' },
+        { value: 'preparing', label: 'Preparing' },
+        { value: 'ready', label: 'Ready' },
+        { value: 'delivered', label: 'Delivered' },
+      ]}
+    />
   )
 }
 
 export function SwitchDemo() {
-  return (
-    <span className="inline-flex items-center gap-[var(--space-8)]">
-      <Switch id="sg-switch" defaultChecked />
-      <Label htmlFor="sg-switch">Order sounds</Label>
-    </span>
-  )
+  const [on, setOn] = useState(true)
+  return <Switch label="Order sounds" value={on} onChange={setOn} />
 }
 
 export function TabsDemo() {
+  const [tab, setTab] = useState('active')
   return (
-    <Tabs defaultValue="active" className="w-full">
-      <TabsList>
-        <TabsTrigger value="active">Active</TabsTrigger>
-        <TabsTrigger value="done">Done</TabsTrigger>
-      </TabsList>
-      <TabsContent value="active">Four orders on the board.</TabsContent>
-      <TabsContent value="done">Fourteen orders finished today.</TabsContent>
-    </Tabs>
+    <VStack gap={2} width="100%">
+      <TabList value={tab} onChange={setTab} role="tablist" hasDivider>
+        <Tab value="active" label="Active" panelId="sg-tab-active" />
+        <Tab value="done" label="Done" panelId="sg-tab-done" />
+      </TabList>
+      <div id={`sg-tab-${tab}`} role="tabpanel">
+        <Text>{tab === 'active' ? 'Four orders on the board.' : 'Fourteen orders finished today.'}</Text>
+      </div>
+    </VStack>
   )
 }
 
 export function DialogDemo() {
+  const [open, setOpen] = useState(false)
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button size="dense" variant="ghost">Print card batch…</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Print 50 table cards?</DialogTitle>
-          <DialogDescription>
+    <>
+      <Button size="dense" variant="ghost" onClick={() => setOpen(true)}>Print card batch…</Button>
+      <Dialog isOpen={open} onOpenChange={setOpen} padding={4}>
+        <VStack gap={4}>
+          <DialogHeader title="Print 50 table cards?" onOpenChange={setOpen} hasDivider={false} />
+          <Text color="secondary">
             Each card carries the QR for one table. Printing does not change the menu or the board.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild><Button size="dense" variant="ghost">Cancel</Button></DialogClose>
-          <DialogClose asChild><Button size="dense">Print</Button></DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </Text>
+          <HStack gap={2}>
+            <Button size="dense" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="dense" onClick={() => setOpen(false)}>Print</Button>
+          </HStack>
+        </VStack>
+      </Dialog>
+    </>
   )
 }
 
 export function AlertDialogDemo() {
+  const [open, setOpen] = useState(false)
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button size="dense" variant="ghost">Delete category…</Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete “Starters”?</AlertDialogTitle>
-          <AlertDialogDescription>
-            The <span className="num">6</span> items in it go too. Deleting cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel size="dense">Keep it</AlertDialogCancel>
-          <AlertDialogAction size="dense" variant="danger">Delete category and 6 items</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <Button size="dense" variant="ghost" onClick={() => setOpen(true)}>Delete category…</Button>
+      <AlertDialog
+        isOpen={open}
+        onOpenChange={setOpen}
+        title="Delete “Starters”?"
+        description="The 6 items in it go too. Deleting cannot be undone."
+        actionLabel="Delete category and 6 items"
+        cancelLabel="Keep it"
+        onAction={() => setOpen(false)}
+      />
+    </>
   )
 }
 
 export function DropdownDemo() {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="dense" variant="ghost">More…</Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Order 1284</DropdownMenuLabel>
-        <DropdownMenuItem>Call the customer</DropdownMenuItem>
-        <DropdownMenuItem>Reprint the ticket</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive">Cancel order</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <DropdownMenu
+      button={{ label: 'More…', size: 'sm' }}
+      items={[
+        { type: 'section', title: 'Order 1284', items: [
+          { label: 'Call the customer' },
+          { label: 'Reprint the ticket' },
+        ] },
+        { type: 'divider' },
+        { label: 'Cancel order', variant: 'destructive' },
+      ]}
+    />
   )
 }
 
 export function PopoverDemo() {
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button size="dense" variant="ghost">Why is this pinned?</Button>
-      </PopoverTrigger>
-      <PopoverContent align="start">
-        <PopoverHeader>
-          <PopoverTitle>Address pending</PopoverTitle>
-          <PopoverDescription>
+    <Popover
+      label="Address pending"
+      width={320}
+      content={
+        <VStack gap={1}>
+          <Text weight="semibold">Address pending</Text>
+          <Text color="secondary">
             The caller has not given an address yet. The card stays pinned until one arrives — it never
             times out.
-          </PopoverDescription>
-        </PopoverHeader>
-      </PopoverContent>
+          </Text>
+        </VStack>
+      }
+    >
+      <Button size="dense" variant="ghost">Why is this pinned?</Button>
     </Popover>
   )
 }
 
 export function TooltipDemo() {
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button size="dense" variant="ghost">Elapsed</Button>
-        </TooltipTrigger>
-        <TooltipContent>Counts up from receipt, never hidden.</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip content="Counts up from receipt, never hidden.">
+      <Button size="dense" variant="ghost">Elapsed</Button>
+    </Tooltip>
   )
 }
 
-/** Sonner. Transient confirmations only — never an error that has a retry (§11.15). */
+/** Astryx toasts. Transient confirmations only — never an error that has a retry (§11.15). */
 export function ToastDemo() {
+  const showToast = useToast()
   return (
     <>
-      <Button size="dense" variant="ghost" onClick={() => toast.success('Menu published')}>Success</Button>
-      <Button size="dense" variant="ghost" onClick={() => toast.info('Payment link sent')}>Info</Button>
-      <Button size="dense" variant="ghost" onClick={() => toast.warning('Trial has 5 calls left')}>Warning</Button>
-      <Toaster />
+      <Button size="dense" variant="ghost" onClick={() => showToast({ body: 'Menu published' })}>Success</Button>
+      <Button size="dense" variant="ghost" onClick={() => showToast({ body: 'Payment link sent' })}>Info</Button>
+      <Button size="dense" variant="ghost" onClick={() => showToast({ body: 'Trial has 5 calls left' })}>Warning</Button>
     </>
   )
 }

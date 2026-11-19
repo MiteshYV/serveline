@@ -1,0 +1,14 @@
+/* The cascade-layer order, declared once and imported first (ADR 0010).
+
+   It lives in its own file because Next.js hoists every @import above any inline CSS that follows
+   it: written at the top of globals.css, this line would arrive after the layers it is meant to
+   order, and the order would silently invert.
+
+   Read left to right, later wins:
+   - reset, astryx-base, astryx-theme — Astryx's own reset, component styles and theme tokens.
+   - theme, base, utilities — Tailwind's theme variables, preflight and utilities.
+   - app-base — tokens.css: ServeLine's role tokens and its global base rules. Below astryx-base so
+     an Astryx component's own focus ring and typography beat our global `:focus-visible` and `body`
+     rules. Our tokens have no names in common with Astryx's, so being lower costs them nothing.
+   CSS modules are unlayered and so beat every layer — a component's own module is the override. */
+@layer reset, theme, base, app-base, astryx-base, astryx-theme, components, utilities;

@@ -83,7 +83,7 @@ src/
   adapters/   payments, sms, storage, llm, stt — one interface and one mock each
   auth/       phone OTP and session cookies
   voice/      the call assistant: prompt, loop, tools, guardrails, cost ledger
-  ui/         design tokens, shared components, and ShadCN primitives on a token bridge
+  ui/         role tokens on the Astryx neutral theme, and shared components (ADR 0010)
 contracts/    language-neutral files the Python voice service will also read
 docs/         ADRs, reviews, design specs
 graphify-out/ a knowledge graph of the whole repository — open graph.html

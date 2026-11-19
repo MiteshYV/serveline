@@ -128,14 +128,8 @@ export default async function MenuEditorPage({ params, searchParams }: { params:
                     title={`Delete \u201C${cat.name}\u201D?`}
                     description={
                       cat.items.length === 0
-                        ? <>It is empty, so nothing else goes with it. Deleting it cannot be undone.</>
-                        : (
-                          <>
-                            The <span className="num">{cat.items.length}</span> {cat.items.length === 1 ? 'item' : 'items'} in it go too:{' '}
-                            {listNames(cat.items.map((i) => i.name))}. Deleting cannot be undone — and an item that has already
-                            been ordered cannot be deleted at all, so mark that one sold out instead.
-                          </>
-                        )
+                        ? 'It is empty, so nothing else goes with it. Deleting it cannot be undone.'
+                        : `The ${cat.items.length} ${cat.items.length === 1 ? 'item' : 'items'} in it go too: ${listNames(cat.items.map((i) => i.name))}. Deleting cannot be undone \u2014 and an item that has already been ordered cannot be deleted at all, so mark that one sold out instead.`
                     }
                     confirm={cat.items.length === 0 ? 'Delete category' : `Delete category and ${cat.items.length} ${cat.items.length === 1 ? 'item' : 'items'}`}
                   />
@@ -176,7 +170,7 @@ export default async function MenuEditorPage({ params, searchParams }: { params:
                             fields={{ restaurantId: id, outletId: outlet.id, itemId: item.id }}
                             trigger="Delete"
                             title={`Delete \u201C${item.name}\u201D?`}
-                            description={<>It leaves {outlet.name}&apos;s menu at once and cannot be brought back. To hide it for today instead, mark it sold out.</>}
+                            description={`It leaves ${outlet.name}\u2019s menu at once and cannot be brought back. To hide it for today instead, mark it sold out.`}
                             confirm="Delete item"
                           />
                         </td>

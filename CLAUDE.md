@@ -54,15 +54,16 @@ M1 is complete and browser-verified. See Build Spec §14 and docs/superpowers/sp
   `contracts/voice-tools.json`, never inlined.
 - `src/auth/` — OTP challenges and session cookies. Stateless by design at M1: the OTP lives in a
   signed challenge, not a table, because Build Spec §10 gives it a ten-minute life and nothing else.
-- `src/ui/` — design tokens and shared components. Tokens are CSS custom properties; do not
-  hard-code a colour or a spacing value in a component.
-- `src/ui/primitives/` — ShadCN components (Select, Dialog, Tabs, Popover, Tooltip, DropdownMenu,
-  Switch, Label, Sonner). These are the one place utility classes are allowed, because
-  `shadcn-bridge.css` gives every utility they use a Steel & Enamel token as its value (ADR 0008).
-  A utility that does not resolve to a token is a bug. There is one Button in this codebase and it
-  is `src/ui/Button.tsx`; do not add a second. Do not add a `dark:` utility — tokens.css already
-  flips. Anything added here that renders on the customer ordering page must be measured against
-  ADR 0003's Lighthouse budget before it ships.
+- `src/ui/` — role tokens and shared components. Tokens are CSS custom properties; do not
+  hard-code a colour or a spacing value in a component. The neutral roles point at the Astryx
+  neutral theme (ADR 0010); the order-state and FSSAI colours are ServeLine's own and are gated by
+  `tokens.test.ts`.
+- Components come from Astryx (`@astryxdesign/core`, ADR 0010). Look up a component's API with
+  `npx astryx component <Name>` rather than guessing. There is one Button in this codebase and it
+  is `src/ui/Button.tsx`, an adapter over Astryx's; do not import Astryx's Button directly or add a
+  second. Do not add a `dark:` utility — Astryx and tokens.css both switch on `html[data-theme]`.
+  Anything added that renders on the customer ordering page must be measured against ADR 0003's
+  Lighthouse budget before it ships; ADR 0010 records that the 40 KB guard is currently breached.
 - `app/` — routes only. Thin. Business rules belong in `src/core/`.
 - `contracts/` — plain JSON and Markdown that the Python voice service will also read at M2.
   Language-neutral by design. No TypeScript in here.

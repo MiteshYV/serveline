@@ -73,7 +73,7 @@ function contrast(a: string, b: string): number {
 function resolve(palette: Map<string, string>, name: string): string | null {
   let value = palette.get(name)
   for (let hops = 0; value && hops < 10; hops++) {
-    if (value.startsWith('#')) return value
+    if (/^#[0-9a-f]{6}$/i.test(value)) return value
     const ref = /^var\((--[\w-]+)\)$/.exec(value)
     if (!ref) return null
     value = palette.get(ref[1]!)
@@ -81,9 +81,31 @@ function resolve(palette: Map<string, string>, name: string): string | null {
   return null
 }
 
+/**
+ * ADR 0010: the neutral roles now point at Astryx's theme tokens, which the neutral theme writes as
+ * `light-dark(light, dark)` pairs. The gates below are only worth anything if they measure the
+ * colours that actually paint, so the theme's own stylesheet is read and each pair is split per
+ * mode. The first `:scope` block is where the theme declares its colour tokens.
+ */
+const themeCss = readFileSync(join(process.cwd(), 'node_modules', '@astryxdesign', 'theme-neutral', 'dist', 'theme.css'), 'utf8')
+const astryx = declarations(ruleBody(themeCss, /:scope\s*\{/))
+
+/** Split every `light-dark(a, b)` value for one mode; everything else passes through. */
+function forMode(palette: Map<string, string>, mode: 0 | 1): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const [name, value] of palette) {
+    const pair = /^light-dark\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)$/.exec(value)
+    out.set(name, pair ? pair[1 + mode]! : value)
+  }
+  return out
+}
+
 const lightPalette = declarations(ruleBody(css, /^:root\s*\{/m))
 const darkPalette = new Map([...lightPalette, ...manual])
-const THEMES: [string, Map<string, string>][] = [['light', lightPalette], ['dark', darkPalette]]
+const THEMES: [string, Map<string, string>][] = [
+  ['light', forMode(new Map([...astryx, ...lightPalette]), 0)],
+  ['dark', forMode(new Map([...astryx, ...darkPalette]), 1)],
+]
 
 const LOUD_STATES = ['received', 'preparing', 'ready', 'attention']
 
@@ -156,7 +178,7 @@ test('§13 gate: primary and secondary text clear 4.5:1 on every ground, in both
  * That makes card-only a property of the role rather than a defect in it. This test pins the
  * ground it is valid on, so the restriction is enforced rather than remembered.
  */
-test('§13 gate: --text-tertiary is card-only, and clears 4.5:1 there in both themes', () => {
+test('§13 gate: --text-tertiary clears 4.5:1 on the card in both themes', () => {
   const failures: string[] = []
   for (const [theme, palette] of THEMES) {
     const ink = resolve(palette, '--text-tertiary')!
@@ -215,7 +237,9 @@ test('dark re-points every role the light palette defines', () => {
     .filter(([name]) => !CONSTANT_BY_DESIGN.has(name))
     // A role that resolves to another role follows it. A role whose light value is `none` —
     // --elev-0 — has no colour to re-point in the first place.
-    .filter(([, value]) => value !== 'none' && !value.startsWith('var('))
+    // ADR 0010: a value written as light-dark(), or built from Astryx tokens that are, themes
+    // itself and needs no dark block.
+    .filter(([, value]) => value !== 'none' && !value.includes('var(') && !value.startsWith('light-dark('))
     .map(([name]) => name)
 
   assert.deepEqual(
