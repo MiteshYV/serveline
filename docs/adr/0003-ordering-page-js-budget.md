@@ -1,7 +1,8 @@
 # ADR 0003 — The ordering page's JavaScript budget
 
 Date: 20 September 2026
-Status: Accepted
+Status: Accepted, amended by ADR 0010 (20 November 2026): the 40 KB non-framework guard and the
+"below 90 needs a reason" line are withdrawn; the Lighthouse ≥ 85 floor stays
 Amends: Build Spec §6 ("under 100 KB of JavaScript")
 
 ## Context

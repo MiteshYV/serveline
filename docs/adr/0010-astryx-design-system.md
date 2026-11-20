@@ -4,7 +4,7 @@ Date: 19 November 2026
 Status: Accepted
 Supersedes: ADR 0008
 Amends: `docs/design/steel-and-enamel.md` (the neutral chrome only — see "What stays"), ADR 0003
-(measured below; the secondary JavaScript guard is now breached and is an open item)
+(the secondary JavaScript guard is withdrawn; the ≥ 85 floor stays — see "Measured")
 
 ## Context
 
@@ -94,9 +94,16 @@ one run of three fell to 89.
 40 KB gzipped (it was ~30 KB). Astryx adds about 88 KB to this page by itself: its Button brings
 the press, hit-area, haptics and layer (tooltip) machinery, and the root `<Theme>` brings the
 reader-text-size probe. That is recorded here rather than resolved by quietly raising the number.
-**Open:** either amend ADR 0003's guard, or keep the customer surface's buttons on a native
-`<button>` styled from the same tokens (it would keep the look and drop most of the cost) — a
-product decision, not one this ADR takes.
+**Resolved, 20 November 2026 — the product owner's decision.** The restaurant dashboard is the
+primary product experience and the customer ordering page is secondary; customers are on 4G, not
+the 3G profile ADR 0003 was written against. So:
+
+- ADR 0003's **40 KB non-framework JavaScript guard is withdrawn.** The ordering page is not kept
+  on native buttons, and Astryx is not stripped from it.
+- The **Lighthouse ≥ 85 floor stays**, as a regression alarm rather than a design constraint: it
+  still passes (89–95 above), and a drop below it means something broke, not that Astryx cost too
+  much. ADR 0003's "below 90 needs a reason" line is withdrawn with the guard.
+- Effort on UI goes to the restaurant dashboard (`/app`) first.
 
 ## Consequences
 
@@ -109,7 +116,8 @@ measured surfaces and the 2–12 px radius scale are gone in favour of Astryx's.
 still describes them; read it for the state, FSSAI, density and motion sections, and this ADR for
 the neutral chrome.
 
-Also bad: the ordering page is heavier, as measured above.
+Also bad: the ordering page is heavier, as measured above — accepted, because the dashboard is the
+primary experience.
 
 Lint: `npm run lint` (`next lint`) fails before and after this change — Next.js 16 removed the
 command. Not touched here.

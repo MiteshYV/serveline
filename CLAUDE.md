@@ -62,8 +62,9 @@ M1 is complete and browser-verified. See Build Spec §14 and docs/superpowers/sp
   `npx astryx component <Name>` rather than guessing. There is one Button in this codebase and it
   is `src/ui/Button.tsx`, an adapter over Astryx's; do not import Astryx's Button directly or add a
   second. Do not add a `dark:` utility — Astryx and tokens.css both switch on `html[data-theme]`.
-  Anything added that renders on the customer ordering page must be measured against ADR 0003's
-  Lighthouse budget before it ships; ADR 0010 records that the 40 KB guard is currently breached.
+  The restaurant dashboard (`/app`) is the primary experience and gets UI effort first; the
+  customer ordering page is secondary. A change to the ordering page must still keep Lighthouse
+  mobile ≥ 85 (ADR 0003 as amended by ADR 0010) — there is no longer a JavaScript byte guard.
 - `app/` — routes only. Thin. Business rules belong in `src/core/`.
 - `contracts/` — plain JSON and Markdown that the Python voice service will also read at M2.
   Language-neutral by design. No TypeScript in here.
