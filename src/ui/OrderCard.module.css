@@ -57,10 +57,13 @@
 }
 
 /* ---- Scan layer (65 cm) ---- */
+/* Wraps rather than clips: on a 320px phone, or past 99 hours, the timer drops to its own line
+   instead of being cut off by the card's overflow. */
 .scan {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-12);
+  gap: var(--space-8) var(--space-12);
   min-width: 0;
 }
 

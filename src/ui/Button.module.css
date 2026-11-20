@@ -1,11 +1,27 @@
 /* Overrides on Astryx's Button (ADR 0010). Unlayered, so they beat its astryx-base styles.
-   Only what Astryx cannot express: ServeLine's touch-target heights and the restaurant's brand. */
+   Only what Astryx cannot express: ServeLine's touch-target heights, label type, the ghost outline
+   and the restaurant's brand. */
 
-.btn { --h: var(--touch-min); height: var(--h); min-height: var(--h); }
+/* Astryx sets labels at 14/500, a mouse size. The counter's decision layer is read from 65 cm
+   (design §6.2), so the label keeps the body size and weight it had before Astryx. */
+.btn {
+  --h: var(--touch-min);
+  height: var(--h);
+  min-height: var(--h);
+  font-size: var(--text-body);
+  font-weight: var(--fw-bold);
+}
 
 .customer { --h: var(--touch-min); }      /* 44 */
 .counter  { --h: var(--touch-counter); }  /* 56 */
 .dense    { --h: var(--touch-dense); }    /* 32 */
+
+/* Astryx's ghost is borderless. --border-control clears 3:1 on both grounds (ADR 0010), so the
+   control's edge stays visible to the low-vision operator SC 1.4.11 is written for. */
+.ghost {
+  border: 1px solid var(--border-control);
+  color: var(--action-ghost-ink);
+}
 
 /* The customer CTA wears the restaurant's normalised brand colour (design §3.5). brand.ts measures
    --brand-on against --brand-fill at onboarding, so the pair is already known to clear 4.5:1. */

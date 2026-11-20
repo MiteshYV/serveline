@@ -10,7 +10,8 @@ type Base = {
    * primary — Astryx `primary`, the accent plate; the default everywhere but the customer CTA.
    * brand   — Astryx `primary` repainted with `--brand-fill` / `--brand-on`; the customer
    *           surface's primary CTA only (design §3.5).
-   * ghost   — Astryx `secondary`: a bordered, unfilled button.
+   * ghost   — Astryx `ghost` plus a `--border-control` outline: a bordered, unfilled button.
+   *           Not Astryx `secondary`, which the neutral theme paints as a filled grey plate.
    * danger  — Astryx `destructive`; permitted only inside a destructive confirm (design §11.1).
    */
   variant?: Variant
@@ -34,7 +35,7 @@ type Base = {
 type ButtonProps = Base & Omit<ComponentPropsWithoutRef<'button'>, 'className' | 'children'> & { href?: undefined }
 type AnchorProps = Base & Omit<ComponentPropsWithoutRef<'a'>, 'className' | 'children'> & { href: string }
 
-const VARIANT = { primary: 'primary', brand: 'primary', ghost: 'secondary', danger: 'destructive' } as const
+const VARIANT = { primary: 'primary', brand: 'primary', ghost: 'ghost', danger: 'destructive' } as const
 const SIZE = { customer: 'lg', counter: 'lg', dense: 'sm' } as const
 
 /** The text a screen reader would read out of `node`, for Astryx's required `label`. */
@@ -58,7 +59,7 @@ function textOf(node: ReactNode): string {
  */
 export function Button(props: ButtonProps | AnchorProps) {
   const { variant = 'primary', size = 'customer', block = false, label, className, children, ...rest } = props
-  const cls = [styles.btn, styles[size], variant === 'brand' ? styles.brand : '', className ?? '']
+  const cls = [styles.btn, styles[size], variant === 'brand' || variant === 'ghost' ? styles[variant] : '', className ?? '']
     .filter(Boolean)
     .join(' ')
   const name = label ?? textOf(children)
