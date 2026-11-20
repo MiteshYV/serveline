@@ -66,7 +66,8 @@ npm run db:seed
 npm run dev
 ```
 
-Then open http://localhost:3000. The seed loads a fictional Bangalore restaurant with a
+Then open http://localhost:3000, which goes to the restaurant dashboard at `/app` (the agent console
+is at `/agent`, the ordering page at `/r/demo`). The seed loads a fictional Bangalore restaurant with a
 three-language menu, a Direct Order Card batch and a discount code.
 
 ## Layout
