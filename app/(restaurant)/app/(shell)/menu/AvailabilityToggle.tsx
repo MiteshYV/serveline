@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Switch } from '@/ui/primitives/switch.tsx'
+import { Switch } from '@astryxdesign/core/Switch'
 import { setAvailability } from './actions.ts'
 
 type Props = {
@@ -49,5 +49,6 @@ export function AvailabilityToggle({ itemId, itemName, available }: Props) {
 
   // The switch's name is the dish: one row, one subject. The state's *word* is the row's
   // "Not available today" (design §3.3) — the position and the word carry it, never the colour.
-  return <Switch checked={on} onCheckedChange={toggle} aria-label={itemName} />
+  // Astryx's Switch takes the name as `label`; hidden, because the dish name is already the row.
+  return <Switch value={on} onChange={toggle} label={itemName} isLabelHidden />
 }

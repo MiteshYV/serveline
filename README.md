@@ -66,7 +66,8 @@ npm run db:seed
 npm run dev
 ```
 
-Then open http://localhost:3000. The seed loads a fictional Bangalore restaurant with a
+Then open http://localhost:3000, which goes to the restaurant dashboard at `/app` (the agent console
+is at `/agent`, the ordering page at `/r/demo`). The seed loads a fictional Bangalore restaurant with a
 three-language menu, a Direct Order Card batch and a discount code.
 
 ## Layout
@@ -83,7 +84,7 @@ src/
   adapters/   payments, sms, storage, llm, stt — one interface and one mock each
   auth/       phone OTP and session cookies
   voice/      the call assistant: prompt, loop, tools, guardrails, cost ledger
-  ui/         design tokens, shared components, and ShadCN primitives on a token bridge
+  ui/         role tokens on the Astryx neutral theme, and shared components (ADR 0010)
 contracts/    language-neutral files the Python voice service will also read
 docs/         ADRs, reviews, design specs
 graphify-out/ a knowledge graph of the whole repository — open graph.html

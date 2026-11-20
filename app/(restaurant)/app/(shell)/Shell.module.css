@@ -1,4 +1,8 @@
 .shell {
+  --shell-max: 720px;
+  /* On a laptop or tablet the header and nav line up with the centred board instead of hugging the
+     left edge; on a phone this resolves to the plain gutter. */
+  --shell-inset: max(0px, calc((100% - var(--shell-max)) / 2));
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
@@ -29,7 +33,7 @@
   align-items: center;
   gap: var(--space-12);
   min-height: var(--touch-counter);
-  padding: 0 var(--space-12);
+  padding: 0 calc(var(--shell-inset) + var(--space-12));
 }
 
 /* --text-tertiary is legal here: the header's ground is --bg-card (4.69:1), not --bg-app. */
@@ -56,7 +60,7 @@
 .nav {
   display: flex;
   gap: var(--space-4);
-  padding: 0 var(--space-8);
+  padding: 0 max(var(--space-8), var(--shell-inset));
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -98,7 +102,7 @@
 .main {
   flex: 1;
   width: 100%;
-  max-width: 720px;
+  max-width: var(--shell-max);
   margin: 0 auto;
   padding: var(--space-12) var(--space-12) var(--space-64);
 }

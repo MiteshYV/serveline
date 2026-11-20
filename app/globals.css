@@ -1,28 +1,31 @@
-/* Tailwind is layered (@layer base/components/utilities); tokens.css is not, so the design system
-   always wins over preflight. Tailwind is for page layout in app/ only — components under src/ui
-   read tokens through their own CSS modules and never use a utility class.
+/* Astryx (ADR 0010) supplies the components and the neutral theme; tokens.css maps ServeLine's
+   role tokens — --bg-card, --text-secondary, --action-fill — onto Astryx's, so every CSS module in
+   the repository follows the Astryx theme in both modes without being rewritten.
 
-   One carve-out, added with ShadCN (ADR 0008): `src/ui/primitives/*` are ShadCN components and do
-   use utility classes. They are allowed to because shadcn-bridge.css gives every semantic utility
-   they touch — bg-background, text-muted-foreground, border-input, ring-ring — a Steel & Enamel
-   token as its value. The rule the original line was protecting still holds: a primitive cannot
-   introduce a colour, a radius or a font the design system has not already decided. A utility that
-   does not resolve to a token is a bug. */
-@import "tailwindcss";
-/* The enter/exit utilities the ShadCN primitives are written against — animate-in, fade-in-0,
-   zoom-in-95, slide-in-from-*. Tailwind v4 does not ship them; without this import they compile to
-   nothing at all and every dialog, popover, select and tooltip appears and disappears with no
-   transition. The package was installed and then not imported, which is worse than not installing
-   it: the class names read as if the motion were there. All of them are opacity and transform
-   only, inside the 300ms ceiling, so design §8 permits them once they actually run. */
-@import "tw-animate-css";
-@import "../src/ui/tokens.css";
-@import "../src/ui/shadcn-bridge.css";
+   Order matters and maps to the layer order declared in layers.css, which the root layout imports
+   before this file. Tailwind stays for page layout in app/ only (grid, gap, max-width); the
+   `tailwind-theme.css` bridge makes its named utilities resolve to Astryx tokens. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import '@astryxdesign/core/reset.css';
+@import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
+@import '@astryxdesign/core/tailwind-theme.css';
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '../src/ui/tokens.css' layer(app-base);
 
-/* Preflight fades placeholders to 50% currentColor, which fails contrast.
-   --text-secondary, not --text-tertiary: this rule is global, and --text-tertiary is card-only
-   (4.69:1 on --bg-card but 3.76:1 on --bg-sunken, which is the ground PhoneInput and Field's
-   disabled input both use). The customer's very first field was the failing case. */
+/* Two theme tokens overridden, deliberately and only these two.
+   The neutral theme names Figtree first and ships it from Google Fonts. ServeLine loads no webfont
+   (ADR 0003: zero webfonts is part of why the ordering page paints in 0.9s on 3G), and Figtree has
+   no Devanagari or Kannada, so a Hindi or Kannada menu would fall through to whatever the browser
+   picked glyph by glyph. --font-ui is the stack that covers all three scripts.
+   Unlayered, so it beats the theme's own declaration in astryx-theme. */
+[data-astryx-theme] {
+  --font-family-body: var(--font-ui);
+  --font-family-heading: var(--font-ui);
+}
+
+/* Preflight fades placeholders to 50% currentColor, which fails contrast. */
 ::placeholder {
   color: var(--text-secondary);
   opacity: 1;

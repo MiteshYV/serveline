@@ -1,7 +1,7 @@
 # ADR 0008 — ShadCN supplies the primitives; Steel & Enamel keeps the look
 
 Date: 23 September 2026
-Status: Accepted
+Status: Superseded by ADR 0010 (19 November 2026)
 Amends: `app/globals.css` (the "never a utility class" rule), ADR 0002 §3 (dark mode, unchanged but now load-bearing for a second consumer)
 
 ## Context
